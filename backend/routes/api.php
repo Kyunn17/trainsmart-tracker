@@ -2,16 +2,18 @@
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\WorkoutController;
+use App\Http\Controllers\ReviewController;
 
-// (Kodingan bawaan yang udah ada di atas biarin aja)
+// Workout & Hypertrophy Tracker Endpoints
+Route::get('/menu-latihan', [WorkoutController::class, 'index']);
+Route::get('/categories', [WorkoutController::class, 'index']);
+Route::get('/categories/{id}', [WorkoutController::class, 'show']);
+Route::post('/exercises', [WorkoutController::class, 'storeExercise']);
 
-Route::get('/menu-latihan', function () {
-    // Ajaibnya ORM Laravel: Ambil semua kategori, sekalian bawa data gerakannya!
-    $data = Category::with('exercises')->get();
-    
-    return response()->json([
-        'status' => 'MANTAP',
-        'pesan' => 'Data jadwal dan gerakan berhasil ditarik, bre!',
-        'data' => $data
-    ]);
-});
+Route::get('/workout-logs', [WorkoutController::class, 'history']);
+Route::post('/workout-logs', [WorkoutController::class, 'storeLogs']);
+
+// Legacy/Demo endpoints
+Route::get('/reviews', [ReviewController::class, 'index']);
+Route::post('/reviews', [ReviewController::class, 'store']);

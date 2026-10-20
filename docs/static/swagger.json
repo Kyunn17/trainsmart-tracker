@@ -1,0 +1,69 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Review Game API",
+        "description": "API sederhana untuk belajar Swagger",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/reviews": {
+            "get": {
+                "tags": [
+                    "Reviews"
+                ],
+                "summary": "Show all reviews",
+                "operationId": "76a5a6d4c0618089567a531fe395cad4",
+                "responses": {
+                    "200": {
+                        "description": "Succes to get all data reviews"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Reviews"
+                ],
+                "summary": "Make a new review",
+                "operationId": "154c71f5f72b459d998f5ea451bd4c96",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "review"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "type": "string",
+                                        "example": "Budi"
+                                    },
+                                    "review": {
+                                        "type": "string",
+                                        "example": "Game-nya bagus"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Review has been create succesfully"
+                    },
+                    "400": {
+                        "description": "Data is not valid"
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Reviews",
+            "description": "Reviews"
+        }
+    ]
+}
