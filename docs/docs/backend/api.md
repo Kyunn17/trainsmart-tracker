@@ -9,11 +9,33 @@ Folder `/backend` berisi seluruh *source code* berbasis **Laravel** yang berfung
 
 ## Teknologi yang Digunakan
 * **PHP & Laravel Framework:** Mengatur *routing*, *controller*, dan logika bisnis utama.
-* **Eloquent ORM:** Menghubungkan aplikasi dengan *database* MySQL secara elegan (misalnya relasi antara `Category` dan `Exercises`).
-* **L5-Swagger / Scalar:** Menghasilkan dokumentasi API otomatis yang terhubung ke Docusaurus.
+* **Eloquent ORM:** Menghubungkan aplikasi dengan *database* MySQL secara elegan (relasi `Category`, `Exercise`, `User`, `WorkoutLog`).
+* **Laravel Sanctum:** Mengamankan API dengan otentikasi token berbasis bearer.
 
-## Endpoint Utama
-Beberapa *endpoint* penting yang disediakan oleh backend ini:
-* `GET /api/menu-latihan` : Mengambil data kategori latihan beserta daftar gerakannya.
-* `GET /api/reviews` : Mengambil data ulasan atau catatan latihan pengguna.
-* `POST /api/reviews` : Menyimpan data catatan latihan baru ke *database*.
+## Sistem Autentikasi & Otorisasi 3 Peran (Roles)
+
+TrainSmart membagi hak akses ke dalam 3 peran:
+
+### 1. Admin (`admin`)
+* Memiliki kontrol penuh atas seluruh ekosistem aplikasi.
+* **Endpoints**:
+  * `GET /api/admin/stats` : Ringkasan metrik sistem (total user, trainers, clients, total tonase angkatan).
+  * `GET /api/admin/users` : Melihat dan memfilter seluruh pengguna.
+  * `PATCH /api/admin/users/{id}` : Mengubah peran user (`admin`, `trainer`, `client`) dan menetapkan trainer.
+  * `DELETE /api/admin/users/{id}` : Menghapus user dari sistem.
+
+### 2. Personal Trainer (`trainer`)
+* Membimbing klien dan memantau perkembangan progressive overload.
+* **Endpoints**:
+  * `GET /api/trainer/clients` : Mengambil daftar klien yang berada di bawah bimbingan.
+  * `POST /api/trainer/clients` : Menambahkan klien baru via email.
+  * `DELETE /api/trainer/clients/{clientId}` : Melepas klien dari bimbingan.
+  * `GET /api/trainer/clients/{clientId}/progress` : Melihat analisis detail progres latihan & RIR klien.
+
+### 3. Client / Member (`client`)
+* Menjalankan program latihan hipertrofi dan memilih Personal Trainer.
+* **Endpoints**:
+  * `GET /api/trainers` : Melihat daftar seluruh Personal Trainer bersertifikasi beserta keahliannya.
+  * `POST /api/client/select-trainer` : Memilih atau mengganti Personal Trainer.
+  * `GET /api/client/my-progress` : Melihat riwayat progres beban dan tonase pribadi.
+  * `POST /api/workout-logs` : Menyimpan catatan sesi latihan aktif ke database.

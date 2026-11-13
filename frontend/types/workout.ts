@@ -1,6 +1,8 @@
 export interface WorkoutLogEntry {
   id?: number;
+  user_id?: number | null;
   exercise_id: number;
+  exercise?: Exercise;
   set_number: number;
   weight: number | string;
   reps: number | string;
@@ -35,12 +37,33 @@ export interface Category {
   exercises: Exercise[];
 }
 
-export interface WorkoutSessionSummary {
-  categoryName: string;
-  totalSets: number;
-  totalReps: number;
-  totalVolume: number; // kg lifted
-  completedExercisesCount: number;
-  averageRir: number;
-  logs: WorkoutLogEntry[];
+export type UserRole = "admin" | "trainer" | "client";
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+  trainer_id?: number | null;
+  phone?: string | null;
+  specialization?: string | null;
+  trainer?: User | null;
+  clients?: User[];
+  clients_count?: number;
+  workout_logs_count?: number;
+  workout_logs?: WorkoutLogEntry[];
+  created_at?: string;
 }
+
+export interface ClientProgressSummary {
+  total_sets: number;
+  total_volume_kg: number;
+  average_rir: number | null;
+}
+
+export interface ClientProgressResponse {
+  client: User;
+  summary: ClientProgressSummary;
+  data: WorkoutLogEntry[];
+}
+

@@ -1,69 +1,177 @@
 {
-    "openapi": "3.0.0",
-    "info": {
-        "title": "Review Game API",
-        "description": "API sederhana untuk belajar Swagger",
-        "version": "1.0.0"
-    },
-    "paths": {
-        "/api/reviews": {
-            "get": {
-                "tags": [
-                    "Reviews"
-                ],
-                "summary": "Show all reviews",
-                "operationId": "76a5a6d4c0618089567a531fe395cad4",
-                "responses": {
-                    "200": {
-                        "description": "Succes to get all data reviews"
-                    }
+  "openapi": "3.0.0",
+  "info": {
+    "title": "TrainSmart Fitness Tracker API",
+    "description": "Production REST API untuk Hypertrophy & Fitness Tracking Monorepo",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8000",
+      "description": "Local Laravel Server"
+    }
+  ],
+  "paths": {
+    "/api/register": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Register a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password"],
+                "properties": {
+                  "name": { "type": "string", "example": "Budi GymBro" },
+                  "email": { "type": "string", "example": "budi@trainsmart.com" },
+                  "password": { "type": "string", "example": "password123" },
+                  "role": { "type": "string", "enum": ["client", "trainer", "admin"], "default": "client" }
                 }
-            },
-            "post": {
-                "tags": [
-                    "Reviews"
-                ],
-                "summary": "Make a new review",
-                "operationId": "154c71f5f72b459d998f5ea451bd4c96",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nama",
-                                    "review"
-                                ],
-                                "properties": {
-                                    "nama": {
-                                        "type": "string",
-                                        "example": "Budi"
-                                    },
-                                    "review": {
-                                        "type": "string",
-                                        "example": "Game-nya bagus"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Review has been create succesfully"
-                    },
-                    "400": {
-                        "description": "Data is not valid"
-                    }
-                }
+              }
             }
+          }
+        },
+        "responses": {
+          "201": { "description": "Registration successful" },
+          "422": { "description": "Validation error" }
         }
+      }
     },
-    "tags": [
-        {
-            "name": "Reviews",
-            "description": "Reviews"
+    "/api/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Authenticate user & obtain token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "example": "budi@trainsmart.com" },
+                  "password": { "type": "string", "example": "password123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful" },
+          "401": { "description": "Invalid credentials" }
         }
-    ]
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": ["Authentication"],
+        "summary": "Get authenticated user profile",
+        "responses": {
+          "200": { "description": "Current user profile" },
+          "401": { "description": "Unauthenticated" }
+        }
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "tags": ["Workouts"],
+        "summary": "Get all workout split categories and exercises",
+        "responses": {
+          "200": { "description": "List of workout categories" }
+        }
+      }
+    },
+    "/api/categories/{id}": {
+      "get": {
+        "tags": ["Workouts"],
+        "summary": "Get specific workout category details",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Category details with exercises" },
+          "404": { "description": "Category not found" }
+        }
+      }
+    },
+    "/api/workout-logs": {
+      "get": {
+        "tags": ["Workouts"],
+        "summary": "Get workout history logs",
+        "responses": {
+          "200": { "description": "History logs retrieved" }
+        }
+      },
+      "post": {
+        "tags": ["Workouts"],
+        "summary": "Save completed workout session logs",
+        "responses": {
+          "201": { "description": "Workout logs saved successfully" }
+        }
+      }
+    },
+    "/api/trainers": {
+      "get": {
+        "tags": ["Clients"],
+        "summary": "List all registered personal trainers",
+        "responses": {
+          "200": { "description": "List of trainers" }
+        }
+      }
+    },
+    "/api/client/select-trainer": {
+      "post": {
+        "tags": ["Clients"],
+        "summary": "Select or switch personal trainer",
+        "responses": {
+          "200": { "description": "Trainer updated" }
+        }
+      }
+    },
+    "/api/client/my-progress": {
+      "get": {
+        "tags": ["Clients"],
+        "summary": "Get progressive overload progress data",
+        "responses": {
+          "200": { "description": "Progress metrics" }
+        }
+      }
+    },
+    "/api/trainer/clients": {
+      "get": {
+        "tags": ["Trainers"],
+        "summary": "List clients under trainer guidance",
+        "responses": {
+          "200": { "description": "List of assigned clients" }
+        }
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get system wide platform statistics",
+        "responses": {
+          "200": { "description": "Platform statistics" }
+        }
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "List and filter all platform users",
+        "responses": {
+          "200": { "description": "List of users" }
+        }
+      }
+    }
+  },
+  "tags": [
+    { "name": "Authentication", "description": "User registration, login, and sessions" },
+    { "name": "Workouts", "description": "Exercise categories and workout logs" },
+    { "name": "Clients", "description": "Member and client operations" },
+    { "name": "Trainers", "description": "Coach and trainer client management" },
+    { "name": "Admin", "description": "System administration and metrics" }
+  ]
 }

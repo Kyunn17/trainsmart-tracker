@@ -64,10 +64,13 @@ class WorkoutController extends Controller
             'logs.*.notes' => 'nullable|string|max:1000',
         ]);
 
-        $createdLogs = DB::transaction(function () use ($validated) {
+        $userId = auth('sanctum')->id() ?? $request->user_id;
+
+        $createdLogs = DB::transaction(function () use ($validated, $userId) {
             $inserted = [];
             foreach ($validated['logs'] as $logData) {
                 $inserted[] = WorkoutLog::create([
+                    'user_id' => $userId,
                     'exercise_id' => $logData['exercise_id'],
                     'set_number' => $logData['set_number'],
                     'weight' => $logData['weight'],

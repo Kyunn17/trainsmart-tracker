@@ -30,8 +30,8 @@ export default function Home(): ReactNode {
   <Link className="button button--secondary" to="/docs/frontend/components">
     Panduan Frontend
   </Link>
-  <Link className="button button--outline button--primary" to="/docs/science-based-lifting/volume">
-    Logika SBL
+  <Link className="button button--outline button--primary" to="/docs/frontend/state-mgmt">
+    State & SBL
   </Link>
 </div>
         </div>

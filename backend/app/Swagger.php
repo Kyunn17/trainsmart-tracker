@@ -5,9 +5,9 @@ namespace App;
 use OpenApi\Attributes as OA;
 
 #[OA\Info(
-    title: 'Review Game API',
+    title: 'TrainSmart Fitness Tracker API',
     version: '1.0.0',
-    description: 'API sederhana untuk belajar Swagger'
+    description: 'REST API untuk Hypertrophy & Fitness Workout Tracking'
 )]
 class Swagger
 {
