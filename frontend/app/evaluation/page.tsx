@@ -66,7 +66,7 @@ export default function WeeklyEvaluationPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      router.replace("/login");
+      router.replace("/");
       return;
     }
 

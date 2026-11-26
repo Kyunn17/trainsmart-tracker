@@ -443,6 +443,7 @@ export async function createExercise(categoryId: number, name: string) {
 export async function getWorkoutHistory(): Promise<WorkoutLogEntry[]> {
   try {
     const res = await fetch(`${API_BASE}/workout-logs`, {
+      headers: authHeaders(),
       cache: 'no-store',
     });
     if (!res.ok) return [];

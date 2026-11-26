@@ -66,8 +66,8 @@ class WorkoutController extends Controller
             'logs.*.notes' => 'nullable|string|max:1000',
         ]);
 
-        $authUser = auth('sanctum')->user();
-        $userId = $authUser?->id ?? $request->user_id;
+        $authUser = $request->user();
+        $userId = $authUser->id;
         $dailySessionId = $validated['daily_session_id'] ?? null;
 
         // Enforce authorization: ensure all logged exercises are either official approved
@@ -165,14 +165,18 @@ class WorkoutController extends Controller
     }
 
     /**
-     * Get recent workout history & hypertrophy logs
+     * Get recent workout history & hypertrophy logs scoped to the authenticated user.
      */
-    public function history()
+    public function history(Request $request)
     {
-        $logs = WorkoutLog::with('exercise.category')
-            ->latest()
-            ->limit(30)
-            ->get();
+        $user = $request->user();
+
+        $query = WorkoutLog::with('exercise.category')->latest();
+        if ($user->role !== 'admin') {
+            $query->where('user_id', $user->id);
+        }
+
+        $logs = $query->limit(30)->get();
 
         return response()->json([
             'status' => 'success',

@@ -205,10 +205,10 @@ export default function HomeLandingPage() {
             </ul>
             <div className="pt-2">
               <Link
-                href="/exercises"
+                href="/register"
                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#C84B11] hover:underline"
               >
-                <span>Jelajahi Perpustakaan 53 Gerakan</span>
+                <span>Daftar & Akses Perpustakaan 53 Gerakan</span>
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>

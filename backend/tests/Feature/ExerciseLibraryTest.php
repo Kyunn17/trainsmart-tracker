@@ -4,13 +4,21 @@ namespace Tests\Feature;
 
 use App\Models\Exercise;
 use App\Models\ExerciseImage;
+use App\Models\User;
 use Database\Seeders\SplitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class ExerciseLibraryTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Sanctum::actingAs(User::factory()->create(['role' => 'client']));
+    }
 
     private function seedSampleExercises(): void
     {

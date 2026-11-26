@@ -23,7 +23,8 @@ class AdminExerciseController extends Controller
         ]);
 
         if ($search = trim((string) $request->query('search', ''))) {
-            $term = "%{$search}%";
+            $escaped = addcslashes($search, '\\%_');
+            $term = "%{$escaped}%";
             $query->where(function ($q) use ($term) {
                 $q->where('name', 'like', $term)
                     ->orWhere('primary_muscle', 'like', $term)

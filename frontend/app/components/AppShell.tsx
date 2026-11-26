@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Dumbbell,
   LogOut,
@@ -21,13 +21,24 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
+const PUBLIC_PATHS = ["/", "/login", "/register"];
+
 export default function AppShell({ children }: AppShellProps) {
-  const { user, logout } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
+  const isPublicPath = PUBLIC_PATHS.includes(pathname);
   const isAuthPage = pathname === "/login" || pathname === "/register";
+  const isProtectedBlocked = !isPublicPath && !user;
   const showSidebar = Boolean(user) && !isAuthPage;
+
+  useEffect(() => {
+    if (!isLoading && !user && !isPublicPath) {
+      router.replace("/");
+    }
+  }, [isLoading, user, isPublicPath, router]);
 
   const roleBadgeColor = {
     admin: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
@@ -95,6 +106,17 @@ export default function AppShell({ children }: AppShellProps) {
   const isNavActive = (href: string) =>
     pathname === href ||
     (href === "/exercises" && pathname === "/my-exercises");
+
+  // Block protected routes immediately until authenticated (redirects guests to /)
+  if (isProtectedBlocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F6F3] text-[#48524C] text-sm">
+        {isLoading
+          ? "Memeriksa sesi login..."
+          : "Mengalihkan ke halaman utama..."}
+      </div>
+    );
+  }
 
   // Guest / Auth Page Layout (minimal top header, no sidebar)
   if (!showSidebar) {

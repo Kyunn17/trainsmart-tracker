@@ -15,7 +15,7 @@ class ClientController extends Controller
     {
         $trainers = User::where('role', 'trainer')
             ->withCount('clients')
-            ->select('id', 'name', 'email', 'phone', 'specialization', 'created_at')
+            ->select('id', 'name', 'specialization', 'created_at')
             ->get();
 
         return response()->json([

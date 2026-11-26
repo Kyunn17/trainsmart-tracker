@@ -33,7 +33,8 @@ class CuratedAndCustomExerciseTest extends TestCase
         $this->seed(CuratedExerciseSeeder::class);
         $this->assertSame($firstCount, Exercise::official()->count());
 
-        // Filter by muscle_region works
+        // Filter by muscle_region works (authenticated)
+        Sanctum::actingAs(User::factory()->create(['role' => 'client']));
         $res = $this->getJson('/api/exercises?muscle_region=upper_chest');
         $res->assertOk();
         $this->assertGreaterThanOrEqual(3, count($res->json('data')));

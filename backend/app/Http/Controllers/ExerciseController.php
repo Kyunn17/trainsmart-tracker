@@ -33,7 +33,8 @@ class ExerciseController extends Controller
         }
 
         if (!empty($validated['search'])) {
-            $term = '%' . trim($validated['search']) . '%';
+            $escaped = addcslashes(trim($validated['search']), '\\%_');
+            $term = '%' . $escaped . '%';
             $query->where(function ($q) use ($term) {
                 $q->where('name', 'like', $term)
                     ->orWhere('primary_muscle', 'like', $term)

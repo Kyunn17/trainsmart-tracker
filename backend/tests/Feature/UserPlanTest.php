@@ -147,6 +147,8 @@ class UserPlanTest extends TestCase
         $upper->exercises()->attach($starter->id, ['is_default_recommended' => true, 'sort_order' => 1]);
         $upper->exercises()->attach($extra->id, ['is_default_recommended' => false, 'sort_order' => 2]);
 
+        Sanctum::actingAs(User::factory()->create(['role' => 'client']));
+
         $this->getJson("/api/splits/{$split->id}")
             ->assertStatus(200)
             ->assertJsonCount(1, 'data.sessions.0.exercises')
