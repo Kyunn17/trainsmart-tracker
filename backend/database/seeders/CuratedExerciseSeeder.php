@@ -4,8 +4,10 @@ namespace Database\Seeders;
 
 use App\Models\Category;
 use App\Models\Exercise;
+use App\Models\ExerciseImage;
 use App\Models\SplitSession;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Storage;
 
 class CuratedExerciseSeeder extends Seeder
 {
@@ -84,6 +86,44 @@ class CuratedExerciseSeeder extends Seeder
 
             if (!empty($syncData)) {
                 $exercise->splitSessions()->sync($syncData);
+            }
+
+            // Link local curated illustrations (movement illustration first if present, plus muscle-region highlight)
+            $disk = Storage::disk('public');
+            $findExisting = function (?string $basePath) use ($disk): ?string {
+                if (!$basePath) {
+                    return null;
+                }
+                foreach (['jpg', 'png', 'webp', 'svg'] as $ext) {
+                    $candidate = "{$basePath}.{$ext}";
+                    if ($disk->exists($candidate)) {
+                        return $candidate;
+                    }
+                }
+                return null;
+            };
+
+            $movementPath = $findExisting("exercises/{$exercise->slug}/0");
+            $regionPath = $exercise->muscle_region
+                ? $findExisting("exercises/regions/{$exercise->muscle_region}")
+                : null;
+
+            if ($movementPath) {
+                ExerciseImage::updateOrCreate(
+                    ['exercise_id' => $exercise->id, 'position' => 0],
+                    ['path' => $movementPath, 'alt_text' => "{$exercise->name} - ilustrasi gerakan"]
+                );
+                if ($regionPath) {
+                    ExerciseImage::updateOrCreate(
+                        ['exercise_id' => $exercise->id, 'position' => 1],
+                        ['path' => $regionPath, 'alt_text' => "{$exercise->name} - target otot"]
+                    );
+                }
+            } elseif ($regionPath) {
+                ExerciseImage::updateOrCreate(
+                    ['exercise_id' => $exercise->id, 'position' => 0],
+                    ['path' => $regionPath, 'alt_text' => "{$exercise->name} - target otot"]
+                );
             }
 
             $sortOrder++;

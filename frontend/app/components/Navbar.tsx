@@ -8,11 +8,8 @@ import {
   LogIn,
   ShieldAlert,
   Users,
-  TrendingUp,
-  Award,
   LayoutGrid,
   BookOpen,
-  CalendarRange,
   BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -47,7 +44,7 @@ export default function Navbar() {
     navItems.push(
       {
         href: "/",
-        label: "Dashboard",
+        label: "Latihan",
         icon: <LayoutGrid className="w-4 h-4 shrink-0" />,
         activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
       },
@@ -59,12 +56,12 @@ export default function Navbar() {
       }
     );
 
-    if (user.role === "admin") {
+    if (user.role === "client") {
       navItems.push({
-        href: "/admin",
-        label: "Admin Panel",
-        icon: <ShieldAlert className="w-4 h-4 shrink-0" />,
-        activeClass: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
+        href: "/evaluation",
+        label: "Evaluasi",
+        icon: <BarChart3 className="w-4 h-4 shrink-0" />,
+        activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
       });
     }
 
@@ -77,33 +74,13 @@ export default function Navbar() {
       });
     }
 
-    if (user.role === "client") {
-      navItems.push(
-        {
-          href: "/onboarding",
-          label: "Jadwal",
-          icon: <CalendarRange className="w-4 h-4 shrink-0" />,
-          activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
-        },
-        {
-          href: "/evaluation",
-          label: "Evaluasi",
-          icon: <BarChart3 className="w-4 h-4 shrink-0" />,
-          activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
-        },
-        {
-          href: "/client/progress",
-          label: "Progres",
-          icon: <TrendingUp className="w-4 h-4 shrink-0" />,
-          activeClass: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
-        },
-        {
-          href: "/client/trainer",
-          label: "Trainer",
-          icon: <Award className="w-4 h-4 shrink-0" />,
-          activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
-        }
-      );
+    if (user.role === "admin") {
+      navItems.push({
+        href: "/admin",
+        label: "Admin Panel",
+        icon: <ShieldAlert className="w-4 h-4 shrink-0" />,
+        activeClass: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
+      });
     }
   }
 
@@ -125,20 +102,22 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {/* Desktop Navigation (xl+ only to prevent overlap with right user cluster) */}
+        {/* Desktop Navigation (clean 3-item center nav) */}
         {showAppNav && (
           <nav
             aria-label="Navigasi utama"
-            className="hidden xl:flex items-center justify-center gap-1 min-w-0 flex-1"
+            className="hidden md:flex items-center justify-center gap-1.5 min-w-0 flex-1"
           >
             {navItems.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive =
+                pathname === item.href ||
+                (item.href === "/exercises" && pathname === "/my-exercises");
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   aria-current={isActive ? "page" : undefined}
-                  className={`px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 border whitespace-nowrap transition-colors ${
+                  className={`px-3.5 py-2 rounded-xl text-sm font-medium flex items-center gap-2 border whitespace-nowrap transition-colors ${
                     isActive
                       ? `${item.activeClass} font-semibold`
                       : "border-transparent text-[#48524C] hover:text-[#141916] hover:bg-[#ECEFE9]"
@@ -158,7 +137,7 @@ export default function Navbar() {
             <div className="flex items-center gap-2.5">
               <div className="flex items-center gap-2">
                 <span
-                  className="hidden sm:inline-block text-sm font-semibold text-[#141916] max-w-[130px] truncate"
+                  className="hidden sm:inline-block text-sm font-semibold text-[#141916] max-w-[140px] truncate"
                   title={user.name}
                 >
                   {user.name}
@@ -207,20 +186,22 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Tablet & Mobile Navigation Strip (under 1280px, logged-in users only) */}
+      {/* Mobile Navigation Strip (under md, logged-in users only) */}
       {showAppNav && (
         <nav
           aria-label="Navigasi seluler"
-          className="xl:hidden border-t border-[#DCE1D8] bg-[#F5F6F3] px-4 sm:px-6 py-2 flex items-center gap-2 overflow-x-auto"
+          className="md:hidden border-t border-[#DCE1D8] bg-[#F5F6F3] px-4 py-2 flex items-center justify-center gap-2 overflow-x-auto"
         >
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              pathname === item.href ||
+              (item.href === "/exercises" && pathname === "/my-exercises");
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 whitespace-nowrap border transition-colors shrink-0 ${
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 whitespace-nowrap border transition-colors shrink-0 ${
                   isActive
                     ? `${item.activeClass} font-semibold`
                     : "bg-white border-[#DCE1D8] text-[#48524C] hover:text-[#141916]"

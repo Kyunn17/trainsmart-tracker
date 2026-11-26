@@ -140,11 +140,20 @@ export default function WeeklyEvaluationPage() {
             </p>
           </div>
 
-          <div
-            className="flex items-center gap-1 p-1 bg-white border border-[#DCE1D8] rounded-xl self-start sm:self-auto"
-            role="tablist"
-            aria-label="Pilih periode evaluasi"
-          >
+          <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+            <Link
+              href="/client/progress"
+              className="h-11 px-4 bg-white hover:bg-[#ECEFE9] border border-[#C5CCC0] text-[#141916] rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
+            >
+              <TrendingUp className="w-4 h-4 text-[#047857]" />
+              <span>Progres Detail</span>
+            </Link>
+
+            <div
+              className="flex items-center gap-1 p-1 bg-white border border-[#DCE1D8] rounded-xl"
+              role="tablist"
+              aria-label="Pilih periode evaluasi"
+            >
             <button
               type="button"
               role="tab"
@@ -177,6 +186,7 @@ export default function WeeklyEvaluationPage() {
             >
               Minggu Ini
             </button>
+          </div>
           </div>
         </div>
 

@@ -37,9 +37,13 @@ export default function ExerciseThumbnail({
     );
   }
 
+  const isSvg = src.toLowerCase().endsWith(".svg");
+
   return (
     <div
-      className={`relative bg-[#ECEFE9] overflow-hidden border border-[#DCE1D8] ${className}`}
+      className={`relative ${
+        isSvg ? "bg-[#F5F6F3]" : "bg-[#ECEFE9]"
+      } overflow-hidden border border-[#DCE1D8] ${className}`}
     >
       {!isLoaded && (
         <div
@@ -51,12 +55,15 @@ export default function ExerciseThumbnail({
         src={src}
         alt={alt}
         fill
+        unoptimized={isSvg}
         sizes={sizes}
         loading={priority ? undefined : "lazy"}
         priority={priority}
         onLoad={() => setIsLoaded(true)}
         onError={() => setHasError(true)}
-        className={`object-cover transition-opacity duration-200 ${
+        className={`${
+          isSvg ? "object-contain" : "object-cover"
+        } transition-opacity duration-200 ${
           isLoaded ? "opacity-100" : "opacity-0"
         }`}
       />

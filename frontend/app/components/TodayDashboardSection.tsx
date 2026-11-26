@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
+  Award,
   BarChart3,
   CalendarClock,
   CalendarRange,
@@ -19,6 +20,7 @@ import {
   SkipForward,
   Sparkles,
   StickyNote,
+  TrendingUp,
   Users,
   X,
 } from "lucide-react";
@@ -314,7 +316,32 @@ export default function TodayDashboardSection() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Quick Action Bar (Schedule, Progress, Personal Trainer) */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <Link
+          href="/onboarding"
+          className="h-10 px-4 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] hover:border-[#C5CCC0] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs"
+        >
+          <CalendarRange className="w-4 h-4 text-[#C84B11]" />
+          <span>Atur Jadwal</span>
+        </Link>
+        <Link
+          href="/client/progress"
+          className="h-10 px-4 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] hover:border-[#C5CCC0] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs"
+        >
+          <TrendingUp className="w-4 h-4 text-[#047857]" />
+          <span>Progres & Riwayat</span>
+        </Link>
+        <Link
+          href="/client/trainer"
+          className="h-10 px-4 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] hover:border-[#C5CCC0] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs"
+        >
+          <Award className="w-4 h-4 text-[#1D4ED8]" />
+          <span>Personal Trainer</span>
+        </Link>
+      </div>
+
       {/* Client without onboarding plan */}
       {!todayData || !todayData.has_plan || !todayData.data ? (
         <section className="bg-white border border-[#DCE1D8] rounded-2xl p-6 sm:p-7 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
