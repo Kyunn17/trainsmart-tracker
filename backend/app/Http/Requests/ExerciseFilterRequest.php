@@ -16,10 +16,12 @@ class ExerciseFilterRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:100'],
             'muscle' => ['nullable', 'string', 'max:40'],
+            'muscle_region' => ['nullable', 'string', 'max:60'],
             'equipment' => ['nullable', 'string', 'max:40'],
             'difficulty' => ['nullable', 'in:beginner,intermediate,advanced'],
             'beginner_only' => ['nullable', 'boolean'],
             'session_type' => ['nullable', 'string', 'max:40'],
+            'scope' => ['nullable', 'in:all,official,custom'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:50'],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
@@ -29,6 +31,7 @@ class ExerciseFilterRequest extends FormRequest
     {
         return [
             'difficulty.in' => 'Tingkat kesulitan harus beginner, intermediate, atau advanced.',
+            'scope.in' => 'Filter sumber gerakan harus all, official, atau custom.',
             'per_page.integer' => 'Jumlah per halaman harus berupa angka.',
             'per_page.max' => 'Maksimal 50 gerakan per halaman.',
         ];

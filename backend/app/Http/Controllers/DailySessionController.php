@@ -73,6 +73,8 @@ class DailySessionController extends Controller
             'workoutLogs.exercise',
             'splitSession.exercises' => function ($query) {
                 $query->where('exercises.is_active', true)
+                    ->where('exercises.is_custom', false)
+                    ->where('exercises.approval_status', 'approved')
                     ->where('exercise_split_session.is_default_recommended', true)
                     ->with('images');
             },
@@ -143,6 +145,8 @@ class DailySessionController extends Controller
             'workoutLogs.exercise',
             'splitSession.exercises' => function ($query) {
                 $query->where('exercises.is_active', true)
+                    ->where('exercises.is_custom', false)
+                    ->where('exercises.approval_status', 'approved')
                     ->where('exercise_split_session.is_default_recommended', true)
                     ->with('images');
             },

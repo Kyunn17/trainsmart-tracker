@@ -8,6 +8,7 @@ use App\Http\Controllers\AdminSplitController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CoachingRequestController;
+use App\Http\Controllers\CustomExerciseController;
 use App\Http\Controllers\DailySessionController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\ExerciseController;
@@ -37,7 +38,7 @@ Route::post('/workout-logs', [WorkoutController::class, 'storeLogs']);
 Route::get('/splits/recommendations', [SplitController::class, 'recommendations']);
 Route::get('/splits/{id}', [SplitController::class, 'show'])->whereNumber('id');
 
-// --- Exercise Library ---
+// --- Exercise Library (official + authenticated user's approved custom exercises) ---
 Route::get('/exercises', [ExerciseController::class, 'index']);
 Route::get('/exercises/{idOrSlug}', [ExerciseController::class, 'show']);
 
@@ -46,6 +47,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'me']);
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Custom Exercises (Private per creator, requires Admin ACC for non-admins)
+    Route::get('/my-exercises', [CustomExerciseController::class, 'index']);
+    Route::post('/my-exercises', [CustomExerciseController::class, 'store']);
+    Route::patch('/my-exercises/{id}', [CustomExerciseController::class, 'update'])->whereNumber('id');
+    Route::delete('/my-exercises/{id}', [CustomExerciseController::class, 'destroy'])->whereNumber('id');
+    Route::post('/my-exercises/{id}/images', [CustomExerciseController::class, 'uploadImage'])->whereNumber('id');
+    Route::delete('/my-exercises/{id}/images/{imageId}', [CustomExerciseController::class, 'deleteImage'])->whereNumber(['id', 'imageId']);
 
     // Client-specific actions
     Route::post('/client/select-trainer', [ClientController::class, 'selectTrainer']);
@@ -85,6 +94,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/exercises', [AdminExerciseController::class, 'index']);
         Route::post('/exercises', [AdminExerciseController::class, 'store']);
         Route::patch('/exercises/{id}', [AdminExerciseController::class, 'update'])->whereNumber('id');
+        Route::post('/exercises/{id}/review', [AdminExerciseController::class, 'review'])->whereNumber('id');
+        Route::post('/exercises/{id}/promote', [AdminExerciseController::class, 'promote'])->whereNumber('id');
         Route::post('/exercises/{id}/images', [AdminExerciseController::class, 'uploadImage'])->whereNumber('id');
         Route::delete('/exercises/{id}/images/{imageId}', [AdminExerciseController::class, 'deleteImage'])->whereNumber(['id', 'imageId']);
         Route::get('/splits', [AdminSplitController::class, 'index']);

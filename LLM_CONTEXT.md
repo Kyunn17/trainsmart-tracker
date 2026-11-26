@@ -11,7 +11,7 @@
 Core domain rules:
 - **Hypertrophy & Progressive Overload:** Tracks weight (KG), reps, **RIR (Reps In Reserve: `0` failure, `1–2` optimal hypertrophy, `3+` warm-up)**, tonnage ($kg \times reps$), and 120s rest periods.
 - **Role Hierarchy:** `client` (Member), `trainer` (Personal Trainer), and `admin` (Administrator).
-- **Language:** All user-facing UI copy, split descriptions/pros/cons, schedule warnings, and evaluation suggestions are in **Indonesian**. Exercise dataset names and raw instructions come from `free-exercise-db` (English standard gym names) paired with Indonesian coaching tips/mistakes.
+- **Language:** All user-facing UI copy, split descriptions/pros/cons, curated exercise instructions/mistakes/tips, schedule warnings, and evaluation suggestions are in **Indonesian** (with standard international gym exercise names).
 
 ---
 
@@ -32,7 +32,7 @@ my-monorepo/
 - `npm run dev:backend` — Laravel API server (`http://127.0.0.1:8000`)
 - `npm run build:frontend` — Production Next.js build
 - `php backend/artisan migrate` / `php backend/artisan db:seed`
-- `php backend/artisan exercises:import` — Idempotent importer for `free-exercise-db` (240 exercises + 480 local images across 10 muscle groups)
+- `php backend/artisan db:seed --class=CuratedExerciseSeeder` — Idempotent seeder for TrainSmart's owned 53-exercise curated library (`backend/database/data/curated_exercises.php`) across 15 muscle sub-regions.
 - `Push-Location backend; php artisan test; Pop-Location` — PHPUnit test suite
 
 ---
@@ -42,7 +42,7 @@ my-monorepo/
 ### Core & Expanded Tables
 - **`users`**: `id`, `name`, `email`, `password`, `role` (`client|trainer|admin`), `trainer_id` (nullable FK → `users`), `phone`, `specialization`.
 - **`categories`**: `id`, `name` (legacy Push/Pull/Legs splits, preserved).
-- **`exercises`**: `id`, `category_id` (nullable FK), `name`, `slug` (unique), `primary_muscle` (`chest`, `back`, `shoulders`, `biceps`, `triceps`, `quads`, `hamstrings`, `glutes`, `calves`, `core`), `secondary_muscles` (json), `equipment`, `movement_pattern`, `difficulty` (`beginner|intermediate|advanced`), `is_beginner_friendly` (bool), `instructions` (json), `common_mistakes` (json), `tips` (json), `video_url`, `is_active` (bool), `source`.
+- **`exercises`**: `id`, `category_id` (nullable FK), `user_id` (nullable FK → `users`, `null` = official library), `name`, `slug` (unique), `primary_muscle`, `muscle_region` (`upper_chest`, `middle_chest`, `lower_chest`, `front_delt`, `lateral_delt`, `rear_delt`, `triceps`, `lats`, `mid_back`, `biceps`, `quads`, `hamstrings`, `glutes`, `calves`, `core`), `secondary_muscles` (json), `equipment`, `movement_pattern`, `difficulty`, `is_beginner_friendly` (bool), `instructions` (json), `common_mistakes` (json), `tips` (json), `video_url`, `is_active` (bool), `is_custom` (bool), `approval_status` (`pending|approved|rejected`), `rejection_reason`, `source` (`curated|user_custom`), `deleted_at` (`SoftDeletes`). Enforced by `ExercisePolicy`.
 - **`exercise_images`**: `id`, `exercise_id` (FK), `path` (relative path in `storage/app/public`, e.g. `exercises/{slug}/0.jpg`), `position` (`0` = start, `1` = end), `alt_text`. Model appends `url`.
 - **`splits`**: `id`, `slug` (unique), `name`, `description`, `min_days`, `max_days`, `pros` (json), `cons` (json), `suitable_for`, `is_active`, `sort_order`.
   - Seeded by `SplitSeeder`: `full-body` (2–3 days), `upper-lower` (4 days), `ppl-ul` (5 days), `ppl-ap` (5 days), `ppl-2x` (6 days).
@@ -101,6 +101,10 @@ my-monorepo/
 | `GET` / `PATCH` / `DELETE` | `/api/admin/users` | Admin | User/role/trainer management |
 | `GET` / `POST` / `PATCH` | `/api/admin/exercises` | Admin | Manage exercise catalog |
 | `POST` / `DELETE` | `/api/admin/exercises/{id}/images` | Admin | Upload (`jpg/jpeg/png/webp`, max 2MB, UUID filename) or delete images |
+| `GET` / `POST` / `PATCH` / `DELETE` | `/api/my-exercises` | Any | Private custom exercise CRUD (non-admin submissions start `pending` with anti-spam max 5 concurrent pending; safe archive if used in logs) |
+| `POST` / `DELETE` | `/api/my-exercises/{id}/images` | Owner/Admin | Upload/delete local images for custom exercises |
+| `POST` | `/api/admin/exercises/{id}/review` | Admin | Approve (ACC) or reject (with reason) a user's custom exercise |
+| `POST` | `/api/admin/exercises/{id}/promote` | Admin | Promote a custom exercise to the official curated library |
 | `GET` / `PATCH` | `/api/admin/splits` | Admin | Manage split metadata |
 
 ---
@@ -111,8 +115,8 @@ my-monorepo/
 - `/onboarding` (`onboarding/page.tsx` + `ScheduleBuilder.tsx`): 4-step wizard (`1. Hari Latihan` -> `2. Pilih Split` -> `3. Daftar Gerakan` -> `4. Atur Jadwal` with `@dnd-kit` drag-and-drop, `"Gunakan Rekomendasi"`, and live advisory warnings).
 - `/session/[id]` (`session/[id]/page.tsx`): Launches `WorkoutPlanner` for a specific `DailySession`, showing exercise thumbnails and `"Cara"` detail modal while logging sets.
 - `/workout/[id]` (`workout/[id]/page.tsx`): Preserved legacy category workout session using `WorkoutPlanner`.
-- `/exercises` (`exercises/page.tsx`): Searchable, filterable Exercise Library (`muscle`, `equipment`, `difficulty`, `beginner_only`) with `ExerciseThumbnail` (`next/image`) and `ExerciseDetailModal`.
-- `/credits` (`credits/page.tsx`): Attribution page for `yuhonas/free-exercise-db` (The Unlicense / Public Domain).
+- `/exercises` (`exercises/page.tsx`): Searchable, filterable Exercise Library (`muscle`, `muscle_region`, `equipment`, `difficulty`, `scope`, `beginner_only`) with `ExerciseThumbnail`, `ExerciseDetailModal`, `"Custom"` badges, and `"Ajukan Gerakan Custom"` modal (`CustomExerciseModal`).
+- `/my-exercises` (`my-exercises/page.tsx`): User's private custom exercise manager showing approval statuses (`Menunggu ACC Admin`, `Disetujui & Aktif`, `Ditolak`), edit/re-submit, and safe archive/delete.
 - `/evaluation` (`evaluation/page.tsx`): Weekly evaluation dashboard (`Minggu Lalu` / `Minggu Ini`), 4 KPI cards, rule-based suggestions, and 7-day breakdown.
 - `/client/progress`, `/client/trainer`, `/trainer`, `/admin`, `/login`, `/register`.
 

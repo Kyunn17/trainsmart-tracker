@@ -23,11 +23,13 @@ import {
   Maximize2,
   X,
   HelpCircle,
+  Search,
 } from "lucide-react";
 import { Category, Exercise, SetData, WorkoutLogEntry } from "@/types/workout";
-import { saveWorkoutLogs, createExercise, getExerciseDetail } from "@/lib/api";
+import { saveWorkoutLogs, getExerciseDetail, getExercises } from "@/lib/api";
 import ExerciseThumbnail from "@/app/components/ExerciseThumbnail";
 import ExerciseDetailModal from "@/app/components/ExerciseDetailModal";
+import CustomExerciseModal from "@/app/components/CustomExerciseModal";
 
 interface Props {
   initialCategory: Category;
@@ -75,8 +77,36 @@ export default function WorkoutPlanner({
 
   const [isTracking, setIsTracking] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [namaGerakanBaru, setNamaGerakanBaru] = useState("");
-  const [isAddingExercise, setIsAddingExercise] = useState(false);
+
+  // Exercise Picker modal (official + user's approved custom exercises)
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [pickerResults, setPickerResults] = useState<Exercise[]>([]);
+  const [isLoadingPicker, setIsLoadingPicker] = useState(false);
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isPickerOpen) return;
+    let active = true;
+    const timer = setTimeout(() => {
+      setIsLoadingPicker(true);
+      getExercises({ search: pickerSearch, per_page: 24 })
+        .then((res) => {
+          if (active) setPickerResults(res.data);
+        })
+        .catch(() => {
+          if (active) setPickerResults([]);
+        })
+        .finally(() => {
+          if (active) setIsLoadingPicker(false);
+        });
+    }, 200);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [isPickerOpen, pickerSearch]);
 
   // Active workout timer
   const [workoutSeconds, setWorkoutSeconds] = useState(0);
@@ -222,57 +252,29 @@ export default function WorkoutPlanner({
     showToast("Gerakan dihapus dari sesi ini.", "info");
   };
 
-  // Add custom exercise
-  const handleTambahGerakan = async () => {
-    if (!namaGerakanBaru.trim()) return;
-    setIsAddingExercise(true);
-
-    try {
-      const res = await createExercise(
-        initialCategory.id,
-        namaGerakanBaru.trim()
-      );
-      const newId = res?.data?.id || Date.now();
-
-      const newExercise: Exercise = {
-        id: newId,
-        category_id: initialCategory.id,
-        name: namaGerakanBaru.trim(),
-        targetSets: 3,
-        notes: "",
-        setsData: Array.from({ length: 3 }, () => ({
-          weight: "",
-          reps: "",
-          rir: 1,
-          notes: "",
-          isCompleted: false,
-        })),
-      };
-
-      setActiveExercises((prev) => [...prev, newExercise]);
-      setNamaGerakanBaru("");
-      showToast(`Gerakan "${newExercise.name}" ditambahkan.`, "success");
-    } catch {
-      const newExercise: Exercise = {
-        id: Date.now(),
-        category_id: initialCategory.id,
-        name: namaGerakanBaru.trim(),
-        targetSets: 3,
-        notes: "",
-        setsData: Array.from({ length: 3 }, () => ({
-          weight: "",
-          reps: "",
-          rir: 1,
-          notes: "",
-          isCompleted: false,
-        })),
-      };
-      setActiveExercises((prev) => [...prev, newExercise]);
-      setNamaGerakanBaru("");
-      showToast(`Gerakan "${newExercise.name}" ditambahkan secara lokal.`, "info");
-    } finally {
-      setIsAddingExercise(false);
+  // Add exercise from official + user's approved custom library
+  const handleAddExerciseFromLibrary = (ex: Exercise) => {
+    if (activeExercises.some((item) => item.id === ex.id)) {
+      showToast(`"${ex.name}" sudah ada di sesi ini.`, "warning");
+      return;
     }
+
+    const added: Exercise = {
+      ...ex,
+      targetSets: ex.pivot?.default_sets || 3,
+      notes: "",
+      setsData: Array.from({ length: ex.pivot?.default_sets || 3 }, () => ({
+        weight: "",
+        reps: "",
+        rir: 1,
+        notes: "",
+        isCompleted: false,
+      })),
+    };
+
+    setActiveExercises((prev) => [...prev, added]);
+    showToast(`Gerakan "${ex.name}" ditambahkan ke sesi.`, "success");
+    setIsPickerOpen(false);
   };
 
   const updateSetField = (
@@ -967,26 +969,34 @@ export default function WorkoutPlanner({
               </div>
             )}
 
-            {/* Quick add custom exercise */}
-            <div className="flex flex-col sm:flex-row gap-2.5 p-3 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
-              <input
-                type="text"
-                aria-label="Nama variasi gerakan baru"
-                placeholder="Tambah variasi gerakan baru (misal: Cable Lateral Raise)..."
-                value={namaGerakanBaru}
-                onChange={(e) => setNamaGerakanBaru(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleTambahGerakan()}
-                className="flex-1 h-11 px-3.5 bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl text-sm text-[#141916] outline-none focus:bg-white focus:border-[#C84B11] placeholder:text-[#626E67]"
-              />
-              <button
-                type="button"
-                onClick={handleTambahGerakan}
-                disabled={isAddingExercise || !namaGerakanBaru.trim()}
-                className="h-11 px-5 bg-[#141916] hover:bg-[#48524C] disabled:opacity-40 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>{isAddingExercise ? "Menambahkan..." : "Tambah Gerakan"}</span>
-              </button>
+            {/* Add exercise from library (official + approved custom) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-4 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
+              <div>
+                <p className="text-sm font-bold text-[#141916]">
+                  Tambah Gerakan ke Sesi Ini
+                </p>
+                <p className="text-xs text-[#626E67]">
+                  Pilih dari daftar gerakan resmi atau gerakan custom Anda yang sudah disetujui Admin.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsPickerOpen(true)}
+                  className="h-11 px-4 bg-[#141916] hover:bg-[#C84B11] text-white font-semibold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Pilih dari Library</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModalOpen(true)}
+                  className="h-11 px-4 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#141916] font-semibold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Ajukan Custom</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1588,6 +1598,135 @@ export default function WorkoutPlanner({
           )}
         </div>
       )}
+
+      {/* Exercise Picker Modal (Official + Approved Custom) */}
+      {isPickerOpen && (
+        <div
+          className="fixed inset-0 bg-[#141916]/65 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pilih gerakan dari perpustakaan"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsPickerOpen(false);
+          }}
+        >
+          <div className="bg-white border border-[#DCE1D8] rounded-2xl max-w-xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-xl">
+            <div className="p-4 sm:p-5 border-b border-[#DCE1D8] flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-[#141916]">
+                  Pilih Gerakan dari Perpustakaan
+                </h3>
+                <p className="text-xs text-[#626E67]">
+                  Termasuk gerakan resmi dan gerakan custom Anda yang sudah disetujui Admin.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPickerOpen(false)}
+                className="h-9 w-9 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#48524C] rounded-xl flex items-center justify-center cursor-pointer"
+                aria-label="Tutup pemilih gerakan"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-[#DCE1D8]">
+              <div className="relative">
+                <Search className="w-4 h-4 text-[#626E67] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="search"
+                  placeholder="Cari gerakan (misal: Bench Press, Lateral Raise)..."
+                  value={pickerSearch}
+                  onChange={(e) => setPickerSearch(e.target.value)}
+                  className="w-full h-11 pl-9 pr-3 bg-[#F5F6F3] border border-[#DCE1D8] focus:bg-white focus:border-[#C84B11] rounded-xl text-sm outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto divide-y divide-[#DCE1D8]">
+              {isLoadingPicker ? (
+                <div className="p-5 space-y-2.5 animate-pulse">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-14 bg-[#ECEFE9] rounded-xl" />
+                  ))}
+                </div>
+              ) : pickerResults.length === 0 ? (
+                <div className="p-8 text-center space-y-3">
+                  <p className="text-sm text-[#48524C]">
+                    Gerakan tidak ditemukan di daftar Anda.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPickerOpen(false);
+                      setIsCustomModalOpen(true);
+                    }}
+                    className="h-10 px-4 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tidak ketemu? Ajukan Gerakan Custom</span>
+                  </button>
+                </div>
+              ) : (
+                pickerResults.map((ex) => {
+                  const alreadyAdded = activeExercises.some((a) => a.id === ex.id);
+                  return (
+                    <div
+                      key={ex.id}
+                      className="p-3.5 sm:px-5 flex items-center justify-between gap-3 hover:bg-[#F5F6F3]"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <ExerciseThumbnail
+                          src={ex.images?.[0]?.url}
+                          alt={ex.name}
+                          className="w-11 h-11 rounded-lg shrink-0"
+                          sizes="44px"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold text-[#141916] truncate">
+                              {ex.name}
+                            </span>
+                            {ex.is_custom && (
+                              <span className="px-1.5 py-0.5 rounded bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] text-[10px] font-bold shrink-0">
+                                Custom
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[#626E67] capitalize">
+                            {ex.primary_muscle || "-"} •{" "}
+                            {(ex.equipment || "-").replace("_", " ")}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={alreadyAdded}
+                        onClick={() => handleAddExerciseFromLibrary(ex)}
+                        className="h-9 px-3 bg-[#141916] hover:bg-[#C84B11] disabled:bg-[#ECEFE9] disabled:text-[#626E67] text-white rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
+                      >
+                        {alreadyAdded ? "Ditambahkan" : "Tambah"}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <CustomExerciseModal
+        isOpen={isCustomModalOpen}
+        initialName={pickerSearch.trim()}
+        onClose={() => setIsCustomModalOpen(false)}
+        onSaved={(ex, msg) => {
+          showToast(msg, "success");
+          if (ex.approval_status === "approved" && ex.is_active) {
+            handleAddExerciseFromLibrary(ex);
+          }
+        }}
+      />
 
       <ExerciseDetailModal
         exercise={detailExercise}

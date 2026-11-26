@@ -13,30 +13,13 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Kategori Latihan Utama
-        $push = Category::firstOrCreate(['name' => 'Push']);
-        $pull = Category::firstOrCreate(['name' => 'Pull']);
-        $legs = Category::firstOrCreate(['name' => 'Legs']);
+        // 1. Kategori Latihan Utama (legacy compatibility)
+        Category::firstOrCreate(['name' => 'Push']);
+        Category::firstOrCreate(['name' => 'Pull']);
+        Category::firstOrCreate(['name' => 'Legs']);
 
-        // 2. Gerakan PUSH
-        $incDb = Exercise::firstOrCreate(['category_id' => $push->id, 'name' => 'Incline Dumbbell Press']);
-        Exercise::firstOrCreate(['category_id' => $push->id, 'name' => 'Bench Press']);
-        Exercise::firstOrCreate(['category_id' => $push->id, 'name' => 'Push Up']);
-        Exercise::firstOrCreate(['category_id' => $push->id, 'name' => 'Dips']);
-
-        // 3. Gerakan PULL
-        Exercise::firstOrCreate(['category_id' => $pull->id, 'name' => 'Lat Pulldown']);
-        Exercise::firstOrCreate(['category_id' => $pull->id, 'name' => 'Pull Up']);
-        Exercise::firstOrCreate(['category_id' => $pull->id, 'name' => 'Barbell Row']);
-
-        // 4. Gerakan LEGS
-        Exercise::firstOrCreate(['category_id' => $legs->id, 'name' => 'Squat']);
-        Exercise::firstOrCreate(['category_id' => $legs->id, 'name' => 'Leg Press']);
-        Exercise::firstOrCreate(['category_id' => $legs->id, 'name' => 'Calf Raise']);
-
-        // 5. Seed Users for 3 Roles: Admin, Trainer, Client
-        // Admin
-        $admin = User::firstOrCreate(
+        // 2. Seed Users for 3 Roles: Admin, Trainer, Client
+        User::firstOrCreate(
             ['email' => 'admin@trainsmart.com'],
             [
                 'name' => 'Head Admin',
@@ -47,7 +30,6 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Personal Trainer 1
         $trainerArnold = User::firstOrCreate(
             ['email' => 'arnold@trainsmart.com'],
             [
@@ -59,8 +41,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Personal Trainer 2
-        $trainerChris = User::firstOrCreate(
+        User::firstOrCreate(
             ['email' => 'chris@trainsmart.com'],
             [
                 'name' => 'Coach Chris',
@@ -71,7 +52,6 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Client 1 (Assigned to Coach Arnold)
         $clientBudi = User::firstOrCreate(
             ['email' => 'budi@trainsmart.com'],
             [
@@ -83,8 +63,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Client 2 (Looking for a trainer)
-        $clientSarah = User::firstOrCreate(
+        User::firstOrCreate(
             ['email' => 'sarah@trainsmart.com'],
             [
                 'name' => 'Sarah Fit',
@@ -95,11 +74,15 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // Seed Indonesian workout splits & template sessions
-        $this->call(SplitSeeder::class);
+        // 3. Seed Indonesian workout splits & curated 53-exercise official library
+        $this->call([
+            SplitSeeder::class,
+            CuratedExerciseSeeder::class,
+        ]);
 
-        // Sample initial log for client Budi
-        if (WorkoutLog::where('user_id', $clientBudi->id)->count() === 0) {
+        // 4. Sample initial log for client Budi
+        $incDb = Exercise::where('slug', 'incline-dumbbell-press')->first();
+        if ($incDb && WorkoutLog::where('user_id', $clientBudi->id)->count() === 0) {
             WorkoutLog::create([
                 'user_id' => $clientBudi->id,
                 'exercise_id' => $incDb->id,
@@ -108,7 +91,7 @@ class DatabaseSeeder extends Seeder
                 'reps' => 10,
                 'rir' => 1,
                 'rpe' => 9.0,
-                'notes' => 'Great stretch at the bottom, 3-0-1 tempo',
+                'notes' => 'Regangan terasa bagus di bawah, tempo 3-0-1',
             ]);
             WorkoutLog::create([
                 'user_id' => $clientBudi->id,
@@ -118,7 +101,7 @@ class DatabaseSeeder extends Seeder
                 'reps' => 8,
                 'rir' => 0,
                 'rpe' => 10.0,
-                'notes' => 'Hit failure on rep 8, coach assisted rest pause',
+                'notes' => 'Set terakhir dekat failure dengan kontrol penuh',
             ]);
         }
     }

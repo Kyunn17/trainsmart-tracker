@@ -70,6 +70,38 @@ class WorkoutController extends Controller
         $userId = $authUser?->id ?? $request->user_id;
         $dailySessionId = $validated['daily_session_id'] ?? null;
 
+        // Enforce authorization: ensure all logged exercises are either official approved
+        // or the authenticated user's own approved custom exercises.
+        $exerciseIds = collect($validated['logs'])->pluck('exercise_id')->unique()->values();
+        $exercises = Exercise::query()->whereIn('id', $exerciseIds)->get()->keyBy('id');
+
+        foreach ($exerciseIds as $exId) {
+            $exercise = $exercises->get($exId);
+            if (!$exercise) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Gerakan latihan tidak ditemukan.',
+                ], 404);
+            }
+
+            if ($exercise->is_custom) {
+                $isOwner = $authUser && $exercise->user_id === $authUser->id;
+                $isAdmin = $authUser && $authUser->role === 'admin';
+                if (!$isOwner && !$isAdmin) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Anda tidak memiliki akses untuk mencatat gerakan custom milik pengguna lain.',
+                    ], 403);
+                }
+                if ($exercise->approval_status !== 'approved' || !$exercise->is_active) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Gerakan custom \"{$exercise->name}\" belum disetujui Admin.",
+                    ], 422);
+                }
+            }
+        }
+
         $createdLogs = DB::transaction(function () use ($validated, $userId, $authUser, $dailySessionId) {
             $inserted = [];
             foreach ($validated['logs'] as $logData) {

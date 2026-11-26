@@ -3,20 +3,25 @@
 import { useState, useEffect } from "react";
 import {
   CheckCircle2,
+  Clock,
   Dumbbell,
   Edit3,
   Layers,
   Plus,
   Search,
+  Sparkles,
   Trash2,
   Upload,
   X,
+  XCircle,
 } from "lucide-react";
 import {
   createAdminExercise,
   deleteAdminExerciseImage,
   getAdminExercises,
   getAdminSplits,
+  promoteAdminCustomExercise,
+  reviewAdminCustomExercise,
   updateAdminExercise,
   updateAdminSplit,
   uploadAdminExerciseImage,
@@ -39,12 +44,20 @@ export default function AdminLibraryManager({
 }: AdminLibraryManagerProps) {
   // Exercises state
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [exMeta, setExMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
+  const [exMeta, setExMeta] = useState({
+    current_page: 1,
+    last_page: 1,
+    total: 0,
+    pending_custom_count: 0,
+  });
   const [exSearch, setExSearch] = useState("");
-  const [exStatus, setExStatus] = useState<"all" | "active" | "inactive">("all");
+  const [exStatus, setExStatus] = useState<
+    "all" | "active" | "inactive" | "pending_custom" | "rejected_custom" | "custom" | "official"
+  >("all");
   const [exPage, setExPage] = useState(1);
   const [isLoadingEx, setIsLoadingEx] = useState(true);
   const [exReloadTick, setExReloadTick] = useState(0);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
 
   // Exercise Modal
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
@@ -111,6 +124,7 @@ export default function AdminLibraryManager({
           current_page: res.meta.current_page,
           last_page: res.meta.last_page,
           total: res.meta.total,
+          pending_custom_count: res.meta.pending_custom_count || 0,
         });
       })
       .finally(() => {
@@ -217,6 +231,47 @@ export default function AdminLibraryManager({
     const res = await updateAdminExercise(ex.id, {
       is_active: !(ex.is_active !== false),
     });
+    if (res.success) {
+      onNotify(res.message);
+      setIsLoadingEx(true);
+      setExReloadTick((t) => t + 1);
+    }
+  };
+
+  const handleReviewCustom = async (ex: Exercise, action: "approve" | "reject") => {
+    let reason: string | undefined;
+    if (action === "reject") {
+      const input = window.prompt(
+        `Masukkan alasan penolakan untuk gerakan "${ex.name}":`
+      );
+      if (!input || !input.trim()) return;
+      reason = input.trim();
+    }
+
+    setReviewingId(ex.id);
+    const res = await reviewAdminCustomExercise(ex.id, action, reason);
+    setReviewingId(null);
+
+    if (res.success) {
+      onNotify(res.message);
+      setIsLoadingEx(true);
+      setExReloadTick((t) => t + 1);
+    }
+  };
+
+  const handlePromoteCustom = async (ex: Exercise) => {
+    if (
+      !window.confirm(
+        `Promosikan "${ex.name}" ke Library Resmi agar dapat dipakai semua pengguna TrainSmart?`
+      )
+    ) {
+      return;
+    }
+
+    setReviewingId(ex.id);
+    const res = await promoteAdminCustomExercise(ex.id);
+    setReviewingId(null);
+
     if (res.success) {
       onNotify(res.message);
       setIsLoadingEx(true);
@@ -582,8 +637,8 @@ export default function AdminLibraryManager({
       </div>
 
       {/* Filters */}
-      <div className="p-4 border-b border-[#DCE1D8] flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="p-4 border-b border-[#DCE1D8] flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-center">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-[#626E67] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="search"
@@ -598,17 +653,49 @@ export default function AdminLibraryManager({
           />
         </div>
 
+        <button
+          type="button"
+          onClick={() => {
+            setIsLoadingEx(true);
+            setExStatus(exStatus === "pending_custom" ? "all" : "pending_custom");
+            setExPage(1);
+          }}
+          className={`h-10 px-3.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 cursor-pointer ${
+            exStatus === "pending_custom"
+              ? "bg-[#C84B11] text-white border-[#C84B11]"
+              : exMeta.pending_custom_count > 0
+              ? "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]"
+              : "bg-white text-[#48524C] border-[#C5CCC0]"
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          <span>Menunggu ACC ({exMeta.pending_custom_count})</span>
+        </button>
+
         <select
           aria-label="Filter status aktif gerakan"
           value={exStatus}
           onChange={(e) => {
             setIsLoadingEx(true);
-            setExStatus(e.target.value as "all" | "active" | "inactive");
+            setExStatus(
+              e.target.value as
+                | "all"
+                | "active"
+                | "inactive"
+                | "pending_custom"
+                | "rejected_custom"
+                | "custom"
+                | "official"
+            );
             setExPage(1);
           }}
           className="h-10 px-3 bg-white border border-[#C5CCC0] rounded-xl text-xs font-semibold text-[#141916]"
         >
-          <option value="all">Semua Status</option>
+          <option value="all">Semua Gerakan</option>
+          <option value="official">Library Resmi</option>
+          <option value="pending_custom">Custom: Menunggu ACC</option>
+          <option value="custom">Semua Custom User</option>
+          <option value="rejected_custom">Custom: Ditolak</option>
           <option value="active">Hanya Aktif</option>
           <option value="inactive">Nonaktif</option>
         </select>
@@ -620,12 +707,16 @@ export default function AdminLibraryManager({
             <div key={i} className="h-14 bg-[#ECEFE9] rounded-xl" />
           ))}
         </div>
+      ) : exercises.length === 0 ? (
+        <div className="p-8 text-center text-sm text-[#48524C]">
+          Tidak ada gerakan untuk filter yang dipilih.
+        </div>
       ) : (
         <div className="divide-y divide-[#DCE1D8]">
           {exercises.map((ex) => (
             <div
               key={ex.id}
-              className="p-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              className="p-4 sm:px-6 flex flex-col lg:flex-row lg:items-center justify-between gap-3"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <ExerciseThumbnail
@@ -639,6 +730,21 @@ export default function AdminLibraryManager({
                     <span className="font-semibold text-sm text-[#141916] truncate">
                       {ex.name}
                     </span>
+                    {ex.is_custom && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]">
+                        Custom
+                      </span>
+                    )}
+                    {ex.is_custom && ex.approval_status === "pending" && (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#FFFBEB] text-[#B45309] border border-[#FDE68A]">
+                        Menunggu ACC
+                      </span>
+                    )}
+                    {ex.is_custom && ex.approval_status === "rejected" && (
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#FFF1F2] text-[#BE123C] border border-[#FECDD3]">
+                        Ditolak
+                      </span>
+                    )}
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded border ${
                         ex.is_active !== false
@@ -655,11 +761,51 @@ export default function AdminLibraryManager({
                     <span className="font-mono tabular-nums">
                       {ex.images?.length || 0} foto
                     </span>
+                    {ex.creator && (
+                      <span className="normal-case">
+                        {" "}
+                        • Oleh {ex.creator.name} ({ex.creator.role})
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {ex.is_custom && ex.approval_status !== "approved" && (
+                  <button
+                    type="button"
+                    disabled={reviewingId === ex.id}
+                    onClick={() => handleReviewCustom(ex, "approve")}
+                    className="h-9 px-3 bg-[#047857] hover:bg-[#065F46] text-white rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>ACC</span>
+                  </button>
+                )}
+                {ex.is_custom && ex.approval_status === "pending" && (
+                  <button
+                    type="button"
+                    disabled={reviewingId === ex.id}
+                    onClick={() => handleReviewCustom(ex, "reject")}
+                    className="h-9 px-3 bg-white hover:bg-[#FFF1F2] text-[#BE123C] border border-[#FECDD3] rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>Tolak</span>
+                  </button>
+                )}
+                {ex.is_custom && (
+                  <button
+                    type="button"
+                    disabled={reviewingId === ex.id}
+                    onClick={() => handlePromoteCustom(ex)}
+                    className="h-9 px-3 bg-[#FFF1EA] hover:bg-[#F4C4AC]/50 text-[#C84B11] border border-[#F4C4AC] rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                    title="Jadikan bagian dari Library Resmi untuk semua user"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Jadikan Resmi</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => openEditExercise(ex)}

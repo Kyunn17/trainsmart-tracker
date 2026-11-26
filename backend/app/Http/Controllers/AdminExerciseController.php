@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\AdminStoreExerciseRequest;
 use App\Http\Requests\AdminUpdateExerciseRequest;
 use App\Http\Requests\AdminUploadExerciseImageRequest;
+use App\Http\Requests\ReviewCustomExerciseRequest;
 use App\Models\Exercise;
 use App\Models\ExerciseImage;
 use Illuminate\Http\Request;
@@ -15,13 +16,18 @@ class AdminExerciseController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Exercise::query()->with(['images', 'splitSessions:id,name,split_id']);
+        $query = Exercise::query()->with([
+            'images',
+            'splitSessions:id,name,split_id',
+            'creator:id,name,email,role',
+        ]);
 
         if ($search = trim((string) $request->query('search', ''))) {
             $term = "%{$search}%";
             $query->where(function ($q) use ($term) {
                 $q->where('name', 'like', $term)
                     ->orWhere('primary_muscle', 'like', $term)
+                    ->orWhere('muscle_region', 'like', $term)
                     ->orWhere('equipment', 'like', $term);
             });
         }
@@ -35,10 +41,23 @@ class AdminExerciseController extends Controller
             $query->where('is_active', true);
         } elseif ($status === 'inactive') {
             $query->where('is_active', false);
+        } elseif ($status === 'pending_custom') {
+            $query->where('is_custom', true)->where('approval_status', 'pending');
+        } elseif ($status === 'rejected_custom') {
+            $query->where('is_custom', true)->where('approval_status', 'rejected');
+        } elseif ($status === 'custom') {
+            $query->where('is_custom', true);
+        } elseif ($status === 'official') {
+            $query->where('is_custom', false);
         }
 
         $perPage = min(50, max(1, (int) $request->query('per_page', 20)));
         $paginator = $query->orderByDesc('id')->paginate($perPage);
+
+        $pendingCustomCount = Exercise::query()
+            ->where('is_custom', true)
+            ->where('approval_status', 'pending')
+            ->count();
 
         return response()->json([
             'status' => 'success',
@@ -48,6 +67,7 @@ class AdminExerciseController extends Controller
                 'last_page' => $paginator->lastPage(),
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
+                'pending_custom_count' => $pendingCustomCount,
             ],
         ]);
     }
@@ -61,13 +81,16 @@ class AdminExerciseController extends Controller
         $baseSlug = Str::slug($validated['name']);
         $slug = $baseSlug ?: 'exercise-' . Str::lower(Str::random(6));
         $suffix = 1;
-        while (Exercise::where('slug', $slug)->exists()) {
+        while (Exercise::withTrashed()->where('slug', $slug)->exists()) {
             $slug = "{$baseSlug}-{$suffix}";
             $suffix++;
         }
 
         $validated['slug'] = $slug;
-        $validated['source'] = 'admin';
+        $validated['source'] = 'curated';
+        $validated['is_custom'] = false;
+        $validated['user_id'] = null;
+        $validated['approval_status'] = 'approved';
         $validated['is_active'] = $validated['is_active'] ?? true;
         $validated['difficulty'] = $validated['difficulty'] ?? 'beginner';
         $validated['is_beginner_friendly'] = $validated['is_beginner_friendly'] ?? false;
@@ -87,7 +110,7 @@ class AdminExerciseController extends Controller
             $exercise->splitSessions()->sync($syncData);
         }
 
-        $exercise->load(['images', 'splitSessions:id,name,split_id']);
+        $exercise->load(['images', 'splitSessions:id,name,split_id', 'creator:id,name,email,role']);
 
         return response()->json([
             'status' => 'success',
@@ -118,11 +141,69 @@ class AdminExerciseController extends Controller
             $exercise->splitSessions()->sync($syncData);
         }
 
-        $exercise->load(['images', 'splitSessions:id,name,split_id']);
+        $exercise->load(['images', 'splitSessions:id,name,split_id', 'creator:id,name,email,role']);
 
         return response()->json([
             'status' => 'success',
             'message' => "Gerakan \"{$exercise->name}\" berhasil diperbarui.",
+            'data' => $exercise,
+        ]);
+    }
+
+    /**
+     * Admin approves or rejects a user-submitted custom exercise request.
+     */
+    public function review(ReviewCustomExerciseRequest $request, int $id)
+    {
+        $exercise = Exercise::query()->where('is_custom', true)->findOrFail($id);
+        $validated = $request->validated();
+
+        if ($validated['action'] === 'approve') {
+            $exercise->update([
+                'approval_status' => 'approved',
+                'is_active' => true,
+                'rejection_reason' => null,
+            ]);
+            $message = "Gerakan custom \"{$exercise->name}\" telah disetujui (ACC) dan kini aktif untuk pembuatnya.";
+        } else {
+            $exercise->update([
+                'approval_status' => 'rejected',
+                'is_active' => false,
+                'rejection_reason' => trim((string) $validated['rejection_reason']),
+            ]);
+            $message = "Gerakan custom \"{$exercise->name}\" telah ditolak.";
+        }
+
+        $exercise->load(['images', 'splitSessions:id,name,split_id', 'creator:id,name,email,role']);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $message,
+            'data' => $exercise,
+        ]);
+    }
+
+    /**
+     * Admin promotes a custom exercise into the official curated library visible to all users.
+     */
+    public function promote(int $id)
+    {
+        $exercise = Exercise::query()->where('is_custom', true)->findOrFail($id);
+
+        $exercise->update([
+            'is_custom' => false,
+            'user_id' => null,
+            'approval_status' => 'approved',
+            'rejection_reason' => null,
+            'is_active' => true,
+            'source' => 'curated',
+        ]);
+
+        $exercise->load(['images', 'splitSessions:id,name,split_id', 'creator:id,name,email,role']);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Gerakan \"{$exercise->name}\" berhasil dipromosikan ke Library Resmi untuk semua pengguna.",
             'data' => $exercise,
         ]);
     }

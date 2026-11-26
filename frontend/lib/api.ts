@@ -18,6 +18,8 @@ import {
   TrainerClientTodayResponse,
   AdminExercisePayload,
   ExerciseImage,
+  CustomExercisePayload,
+  MyExercisesResponse,
 } from '@/types/workout';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -509,10 +511,12 @@ export async function getExercises(
   const params = new URLSearchParams();
   if (filters.search?.trim()) params.set('search', filters.search.trim());
   if (filters.muscle) params.set('muscle', filters.muscle);
+  if (filters.muscle_region) params.set('muscle_region', filters.muscle_region);
   if (filters.equipment) params.set('equipment', filters.equipment);
   if (filters.difficulty) params.set('difficulty', filters.difficulty);
   if (filters.beginner_only) params.set('beginner_only', '1');
   if (filters.session_type) params.set('session_type', filters.session_type);
+  if (filters.scope && filters.scope !== 'all') params.set('scope', filters.scope);
   if (filters.page) params.set('page', String(filters.page));
   if (filters.per_page) params.set('per_page', String(filters.per_page));
 
@@ -860,7 +864,7 @@ export async function overrideTrainerClientDailySession(
 export async function getAdminExercises(params: {
   search?: string;
   muscle?: string;
-  status?: 'all' | 'active' | 'inactive';
+  status?: 'all' | 'active' | 'inactive' | 'pending_custom' | 'rejected_custom' | 'custom' | 'official';
   page?: number;
   per_page?: number;
 } = {}): Promise<PaginatedExercisesResponse> {
@@ -1017,6 +1021,238 @@ export async function updateAdminSplit(
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Gagal memperbarui split.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function reviewAdminCustomExercise(
+  id: number,
+  action: 'approve' | 'reject',
+  rejectionReason?: string
+): Promise<{ success: boolean; message: string; data?: Exercise }> {
+  try {
+    const res = await fetch(`${API_BASE}/admin/exercises/${id}/review`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        action,
+        ...(rejectionReason ? { rejection_reason: rejectionReason } : {}),
+      }),
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Review gerakan diproses.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Gagal memproses review gerakan.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function promoteAdminCustomExercise(
+  id: number
+): Promise<{ success: boolean; message: string; data?: Exercise }> {
+  try {
+    const res = await fetch(`${API_BASE}/admin/exercises/${id}/promote`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Gerakan dipromosikan ke library resmi.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Gagal mempromosikan gerakan.';
+    return { success: false, message: msg };
+  }
+}
+
+/* ========================================================================= */
+/* USER CUSTOM EXERCISES (/api/my-exercises)                                 */
+/* ========================================================================= */
+
+export async function getMyExercises(): Promise<MyExercisesResponse> {
+  const res = await fetch(`${API_BASE}/my-exercises`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || 'Gagal memuat daftar gerakan custom Anda.');
+  }
+  return {
+    status: json.status || 'success',
+    data: json.data || [],
+    meta: json.meta || { total: 0, pending_count: 0, max_pending: 5 },
+  };
+}
+
+export async function createCustomExercise(
+  payload: CustomExercisePayload
+): Promise<{
+  success: boolean;
+  message: string;
+  data?: Exercise;
+  errors?: Record<string, string[]>;
+}> {
+  try {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('name', payload.name);
+    formData.append('primary_muscle', payload.primary_muscle);
+    if (payload.muscle_region) formData.append('muscle_region', payload.muscle_region);
+    formData.append('equipment', payload.equipment);
+    if (payload.movement_pattern) formData.append('movement_pattern', payload.movement_pattern);
+    if (payload.difficulty) formData.append('difficulty', payload.difficulty);
+    if (payload.notes) formData.append('notes', payload.notes);
+    (payload.instructions || []).forEach((step, idx) => {
+      formData.append(`instructions[${idx}]`, step);
+    });
+    (payload.common_mistakes || []).forEach((item, idx) => {
+      formData.append(`common_mistakes[${idx}]`, item);
+    });
+    (payload.session_types || []).forEach((st, idx) => {
+      formData.append(`session_types[${idx}]`, st);
+    });
+    if (payload.image) {
+      formData.append('image', payload.image);
+    }
+
+    const res = await fetch(`${API_BASE}/my-exercises`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const firstFieldErr = json.errors
+        ? (Object.values(json.errors)[0] as string[])?.[0]
+        : null;
+      return {
+        success: false,
+        message: firstFieldErr || json.message || 'Gagal mengajukan gerakan custom.',
+        errors: json.errors,
+      };
+    }
+    return {
+      success: true,
+      message: json.message || 'Gerakan custom berhasil diajukan.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function updateCustomExercise(
+  id: number,
+  payload: Partial<CustomExercisePayload>
+): Promise<{ success: boolean; message: string; data?: Exercise }> {
+  try {
+    const res = await fetch(`${API_BASE}/my-exercises/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const firstFieldErr = json.errors
+        ? (Object.values(json.errors)[0] as string[])?.[0]
+        : null;
+      return {
+        success: false,
+        message: firstFieldErr || json.message || 'Gagal memperbarui gerakan custom.',
+      };
+    }
+    return {
+      success: true,
+      message: json.message || 'Gerakan custom diperbarui.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function deleteCustomExercise(
+  id: number
+): Promise<{ success: boolean; archived?: boolean; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/my-exercises/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      archived: json.archived,
+      message: json.message || 'Gerakan custom dihapus.',
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Gagal menghapus gerakan custom.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function uploadCustomExerciseImage(
+  exerciseId: number,
+  file: File,
+  position: 0 | 1
+): Promise<{ success: boolean; message: string; data?: ExerciseImage }> {
+  try {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('position', String(position));
+
+    const res = await fetch(`${API_BASE}/my-exercises/${exerciseId}/images`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Gambar berhasil diunggah.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Gagal mengunggah gambar.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function deleteCustomExerciseImage(
+  exerciseId: number,
+  imageId: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/my-exercises/${exerciseId}/images/${imageId}`,
+      {
+        method: 'DELETE',
+        headers: authHeaders(),
+      }
+    );
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Gambar berhasil dihapus.',
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Gagal menghapus gambar.';
     return { success: false, message: msg };
   }
 }

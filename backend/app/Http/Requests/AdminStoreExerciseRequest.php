@@ -17,6 +17,7 @@ class AdminStoreExerciseRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'primary_muscle' => ['nullable', 'string', 'max:40'],
+            'muscle_region' => ['nullable', 'string', 'max:60'],
             'secondary_muscles' => ['nullable', 'array'],
             'secondary_muscles.*' => ['string', 'max:40'],
             'equipment' => ['nullable', 'string', 'max:40'],

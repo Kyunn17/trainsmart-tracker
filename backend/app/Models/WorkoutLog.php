@@ -26,7 +26,7 @@ class WorkoutLog extends Model
 
     public function exercise(): BelongsTo
     {
-        return $this->belongsTo(Exercise::class);
+        return $this->belongsTo(Exercise::class)->withTrashed();
     }
 
     public function dailySession(): BelongsTo

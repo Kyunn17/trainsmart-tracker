@@ -41,9 +41,11 @@ export interface ExercisePivot {
 export interface Exercise {
   id: number;
   category_id?: number | null;
+  user_id?: number | null;
   name: string;
   slug?: string | null;
   primary_muscle?: string | null;
+  muscle_region?: string | null;
   secondary_muscles?: string[] | null;
   equipment?: string | null;
   movement_pattern?: string | null;
@@ -54,6 +56,12 @@ export interface Exercise {
   tips?: string[] | null;
   video_url?: string | null;
   is_active?: boolean;
+  is_custom?: boolean;
+  approval_status?: "pending" | "approved" | "rejected";
+  rejection_reason?: string | null;
+  source?: string | null;
+  workout_logs_count?: number;
+  creator?: { id: number; name: string; email?: string; role: UserRole } | null;
   images?: ExerciseImage[];
   pivot?: ExercisePivot;
   split_sessions?: SplitSession[];
@@ -129,10 +137,12 @@ export interface ClientProgressResponse {
 export interface ExerciseFilters {
   search?: string;
   muscle?: string;
+  muscle_region?: string;
   equipment?: string;
   difficulty?: string;
   beginner_only?: boolean;
   session_type?: string;
+  scope?: "all" | "official" | "custom";
   page?: number;
   per_page?: number;
 }
@@ -145,6 +155,31 @@ export interface PaginatedExercisesResponse {
     last_page: number;
     per_page: number;
     total: number;
+    pending_custom_count?: number;
+  };
+}
+
+export interface CustomExercisePayload {
+  name: string;
+  primary_muscle: string;
+  muscle_region?: string | null;
+  equipment: string;
+  movement_pattern?: string | null;
+  difficulty?: "beginner" | "intermediate" | "advanced";
+  instructions?: string[];
+  common_mistakes?: string[];
+  notes?: string;
+  session_types?: string[];
+  image?: File | null;
+}
+
+export interface MyExercisesResponse {
+  status: string;
+  data: Exercise[];
+  meta: {
+    total: number;
+    pending_count: number;
+    max_pending: number;
   };
 }
 
@@ -279,6 +314,7 @@ export interface TrainerClientTodayResponse {
 export interface AdminExercisePayload {
   name: string;
   primary_muscle?: string | null;
+  muscle_region?: string | null;
   equipment?: string | null;
   movement_pattern?: string | null;
   difficulty?: "beginner" | "intermediate" | "advanced";

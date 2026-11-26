@@ -41,6 +41,8 @@ class SplitController extends Controller
             ->with([
                 'sessions.exercises' => function ($query) use ($includeAll) {
                     $query->where('exercises.is_active', true)
+                        ->where('exercises.is_custom', false)
+                        ->where('exercises.approval_status', 'approved')
                         ->when(!$includeAll, function ($q) {
                             $q->where('exercise_split_session.is_default_recommended', true);
                         })

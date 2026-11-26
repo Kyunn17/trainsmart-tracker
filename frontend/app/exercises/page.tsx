@@ -11,11 +11,17 @@ import {
   AlertCircle,
   CheckCircle2,
   Dumbbell,
+  Plus,
+  FolderHeart,
 } from "lucide-react";
 import { getExercises, getExerciseDetail } from "@/lib/api";
 import { Exercise } from "@/types/workout";
+import { useAuth } from "@/context/AuthContext";
 import ExerciseThumbnail from "@/app/components/ExerciseThumbnail";
 import ExerciseDetailModal from "@/app/components/ExerciseDetailModal";
+import CustomExerciseModal, {
+  MUSCLE_REGION_MAP,
+} from "@/app/components/CustomExerciseModal";
 
 const MUSCLE_OPTIONS = [
   { value: "", label: "Semua Otot" },
@@ -39,7 +45,7 @@ const EQUIPMENT_OPTIONS = [
   { value: "machine", label: "Mesin Gym" },
   { value: "cable", label: "Cable" },
   { value: "kettlebell", label: "Kettlebell" },
-  { value: "bands", label: "Resistance Band" },
+  { value: "resistance_band", label: "Resistance Band" },
 ];
 
 const DIFFICULTY_OPTIONS = [
@@ -49,7 +55,26 @@ const DIFFICULTY_OPTIONS = [
   { value: "advanced", label: "Lanjutan" },
 ];
 
+const REGION_LABEL: Record<string, string> = {
+  upper_chest: "Upper Chest",
+  middle_chest: "Middle Chest",
+  lower_chest: "Lower Chest",
+  front_delt: "Front Delt",
+  lateral_delt: "Lateral Delt",
+  rear_delt: "Rear Delt",
+  triceps: "Triceps",
+  lats: "Lats / Upper Back",
+  mid_back: "Mid Back",
+  biceps: "Biceps",
+  quads: "Quads",
+  hamstrings: "Hamstrings",
+  glutes: "Glutes",
+  calves: "Calves",
+  core: "Core",
+};
+
 export default function ExercisesPage() {
+  const { user } = useAuth();
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [meta, setMeta] = useState({
     current_page: 1,
@@ -61,8 +86,10 @@ export default function ExercisesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [muscle, setMuscle] = useState("");
+  const [muscleRegion, setMuscleRegion] = useState("");
   const [equipment, setEquipment] = useState("");
   const [difficulty, setDifficulty] = useState("");
+  const [scope, setScope] = useState<"all" | "official" | "custom">("all");
   const [beginnerOnly, setBeginnerOnly] = useState(false);
   const [page, setPage] = useState(1);
 
@@ -71,6 +98,8 @@ export default function ExercisesPage() {
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
     null
   );
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState<string | null>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -97,8 +126,10 @@ export default function ExercisesPage() {
     getExercises({
       search,
       muscle,
+      muscle_region: muscleRegion,
       equipment,
       difficulty,
+      scope,
       beginner_only: beginnerOnly,
       page,
       per_page: 24,
@@ -122,15 +153,27 @@ export default function ExercisesPage() {
     return () => {
       active = false;
     };
-  }, [search, muscle, equipment, difficulty, beginnerOnly, page, refreshTick]);
+  }, [
+    search,
+    muscle,
+    muscleRegion,
+    equipment,
+    difficulty,
+    scope,
+    beginnerOnly,
+    page,
+    refreshTick,
+  ]);
 
   const handleResetFilters = () => {
     setIsLoading(true);
     setSearchInput("");
     setSearch("");
     setMuscle("");
+    setMuscleRegion("");
     setEquipment("");
     setDifficulty("");
+    setScope("all");
     setBeginnerOnly(false);
     setPage(1);
   };
@@ -143,6 +186,8 @@ export default function ExercisesPage() {
     }
   };
 
+  const regionOptions = muscle ? MUSCLE_REGION_MAP[muscle] || [] : [];
+
   return (
     <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -154,14 +199,47 @@ export default function ExercisesPage() {
               <span>Perpustakaan Gerakan</span>
             </h1>
             <p className="text-sm text-[#48524C] mt-1.5">
-              Pelajari teknik gerakan gym lengkap dengan foto posisi awal & akhir, langkah eksekusi, dan tips pemula.
+              Daftar gerakan terkurasi TrainSmart dengan panduan langkah eksekusi, kesalahan umum, dan gerakan custom pribadi Anda.
             </p>
           </div>
 
-          <span className="px-3.5 py-2 bg-white border border-[#DCE1D8] rounded-xl text-xs font-mono tabular-nums font-semibold text-[#48524C] self-start md:self-auto">
-            {meta.total} Gerakan Tersedia
-          </span>
+          <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
+            <span className="px-3.5 py-2.5 bg-white border border-[#DCE1D8] rounded-xl text-xs font-mono tabular-nums font-semibold text-[#48524C]">
+              {meta.total} Gerakan
+            </span>
+            {user && (
+              <>
+                <Link
+                  href="/my-exercises"
+                  className="h-11 px-4 bg-white hover:bg-[#ECEFE9] border border-[#C5CCC0] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-colors"
+                >
+                  <FolderHeart className="w-4 h-4 text-[#C84B11]" />
+                  <span>Gerakan Saya</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModalOpen(true)}
+                  className="h-11 px-4 bg-[#C84B11] hover:bg-[#A83D0B] text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Ajukan Gerakan Custom</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
+
+        {bannerMessage && (
+          <div className="mb-5 p-4 bg-[#ECFDF5] border border-[#A7F3D0] text-[#047857] rounded-2xl text-sm font-medium flex items-center justify-between gap-3">
+            <span>{bannerMessage}</span>
+            <Link
+              href="/my-exercises"
+              className="text-xs font-bold underline whitespace-nowrap"
+            >
+              Lihat Status di Gerakan Saya →
+            </Link>
+          </div>
+        )}
 
         {/* Search & Filter Bar */}
         <section
@@ -190,6 +268,7 @@ export default function ExercisesPage() {
                 onChange={(e) => {
                   setIsLoading(true);
                   setMuscle(e.target.value);
+                  setMuscleRegion("");
                   setPage(1);
                 }}
                 className="w-full h-11 px-3 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] outline-none focus:border-[#C84B11]"
@@ -243,26 +322,105 @@ export default function ExercisesPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                setIsLoading(true);
-                setBeginnerOnly((prev) => !prev);
-                setPage(1);
-              }}
-              aria-pressed={beginnerOnly}
-              className={`h-11 px-4 rounded-xl border text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
-                beginnerOnly
-                  ? "bg-[#ECFDF5] border-[#047857] text-[#047857]"
-                  : "bg-[#F5F6F3] border-[#DCE1D8] text-[#48524C] hover:text-[#141916]"
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Hanya Gerakan Ramah Pemula</span>
-            </button>
+          {/* Sub-Region Pills when muscle has multiple regions */}
+          {regionOptions.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-xs font-semibold text-[#626E67]">
+                Sub-bagian:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLoading(true);
+                  setMuscleRegion("");
+                  setPage(1);
+                }}
+                className={`h-8 px-3 rounded-lg text-xs font-semibold border cursor-pointer ${
+                  muscleRegion === ""
+                    ? "bg-[#141916] text-white border-[#141916]"
+                    : "bg-[#F5F6F3] text-[#48524C] border-[#DCE1D8]"
+                }`}
+              >
+                Semua
+              </button>
+              {regionOptions.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setIsLoading(true);
+                    setMuscleRegion(opt.value);
+                    setPage(1);
+                  }}
+                  className={`h-8 px-3 rounded-lg text-xs font-semibold border cursor-pointer ${
+                    muscleRegion === opt.value
+                      ? "bg-[#FFF1EA] text-[#C84B11] border-[#C84B11]"
+                      : "bg-[#F5F6F3] text-[#48524C] border-[#DCE1D8]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
 
-            {(search || muscle || equipment || difficulty || beginnerOnly) && (
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLoading(true);
+                  setBeginnerOnly((prev) => !prev);
+                  setPage(1);
+                }}
+                aria-pressed={beginnerOnly}
+                className={`h-11 px-4 rounded-xl border text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+                  beginnerOnly
+                    ? "bg-[#ECFDF5] border-[#047857] text-[#047857]"
+                    : "bg-[#F5F6F3] border-[#DCE1D8] text-[#48524C] hover:text-[#141916]"
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Ramah Pemula</span>
+              </button>
+
+              {user && (
+                <div className="inline-flex rounded-xl border border-[#DCE1D8] bg-[#F5F6F3] p-1">
+                  {(
+                    [
+                      { value: "all", label: "Semua" },
+                      { value: "official", label: "Resmi" },
+                      { value: "custom", label: "Custom Saya" },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => {
+                        setIsLoading(true);
+                        setScope(item.value);
+                        setPage(1);
+                      }}
+                      className={`h-9 px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                        scope === item.value
+                          ? "bg-white text-[#141916] shadow-xs"
+                          : "text-[#48524C] hover:text-[#141916]"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {(search ||
+              muscle ||
+              muscleRegion ||
+              equipment ||
+              difficulty ||
+              beginnerOnly ||
+              scope !== "all") && (
               <button
                 type="button"
                 onClick={handleResetFilters}
@@ -317,15 +475,33 @@ export default function ExercisesPage() {
               Tidak Ada Gerakan yang Cocok
             </h2>
             <p className="text-sm text-[#48524C] mb-5">
-              Coba ubah kata kunci pencarian atau reset filter otot dan alat.
+              {user
+                ? "Tidak menemukan gerakan yang Anda cari? Anda bisa mengajukan gerakan custom pribadi."
+                : "Coba ubah kata kunci pencarian atau reset filter otot dan alat."}
             </p>
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="h-11 px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm cursor-pointer"
-            >
-              Tampilkan Semua Gerakan
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {user && (
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModalOpen(true)}
+                  className="h-11 px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>
+                    {searchInput.trim()
+                      ? `Ajukan "${searchInput.trim()}"`
+                      : "Ajukan Gerakan Custom"}
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="h-11 px-5 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#141916] font-semibold rounded-xl text-sm cursor-pointer"
+              >
+                Tampilkan Semua Gerakan
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -349,19 +525,32 @@ export default function ExercisesPage() {
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 360px"
                       />
 
-                      <h2 className="text-base font-bold text-[#141916] group-hover:text-[#C84B11] transition-colors line-clamp-1">
-                        {exercise.name}
-                      </h2>
+                      <div className="flex items-start justify-between gap-2">
+                        <h2 className="text-base font-bold text-[#141916] group-hover:text-[#C84B11] transition-colors line-clamp-1">
+                          {exercise.name}
+                        </h2>
+                        {exercise.is_custom && (
+                          <span className="px-2 py-0.5 rounded-md bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] text-[11px] font-bold shrink-0">
+                            Custom
+                          </span>
+                        )}
+                      </div>
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                        {exercise.primary_muscle && (
+                        {exercise.muscle_region && (
+                          <span className="px-2 py-0.5 rounded-md bg-[#FFF1EA] text-[#C84B11] border border-[#F4C4AC] text-xs font-semibold">
+                            {REGION_LABEL[exercise.muscle_region] ||
+                              exercise.muscle_region}
+                          </span>
+                        )}
+                        {!exercise.muscle_region && exercise.primary_muscle && (
                           <span className="px-2 py-0.5 rounded-md bg-[#FFF1EA] text-[#C84B11] border border-[#F4C4AC] text-xs font-semibold capitalize">
                             {exercise.primary_muscle}
                           </span>
                         )}
                         {exercise.equipment && (
                           <span className="px-2 py-0.5 rounded-md bg-[#ECEFE9] text-[#48524C] text-xs font-medium capitalize">
-                            {exercise.equipment}
+                            {exercise.equipment.replace("_", " ")}
                           </span>
                         )}
                         {exercise.is_beginner_friendly && (
@@ -373,7 +562,7 @@ export default function ExercisesPage() {
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-[#DCE1D8] flex items-center justify-between text-xs font-semibold text-[#C84B11]">
-                      <span>Lihat Panduan & Foto</span>
+                      <span>Lihat Panduan & Teknik</span>
                       <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                     </div>
                   </button>
@@ -417,24 +606,21 @@ export default function ExercisesPage() {
             )}
           </>
         )}
-
-        {/* Attribution footer link */}
-        <footer className="mt-10 pt-5 border-t border-[#DCE1D8] flex flex-wrap items-center justify-between gap-2 text-xs text-[#626E67]">
-          <span>
-            Data dan ilustrasi gerakan disediakan dari dataset terbuka Public Domain.
-          </span>
-          <Link
-            href="/credits"
-            className="font-semibold text-[#C84B11] hover:underline"
-          >
-            Lisensi & Atribusi Data →
-          </Link>
-        </footer>
       </div>
 
       <ExerciseDetailModal
         exercise={selectedExercise}
         onClose={() => setSelectedExercise(null)}
+      />
+
+      <CustomExerciseModal
+        isOpen={isCustomModalOpen}
+        initialName={searchInput.trim()}
+        onClose={() => setIsCustomModalOpen(false)}
+        onSaved={(_ex, msg) => {
+          setBannerMessage(msg);
+          triggerReload();
+        }}
       />
     </main>
   );

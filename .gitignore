@@ -32,7 +32,6 @@ backend/storage/logs/*.log
 backend/storage/framework/cache/*
 backend/storage/framework/sessions/*
 backend/storage/framework/views/*
-backend/storage/app/free-exercise-db-src/
 backend/bootstrap/cache/*
 !backend/bootstrap/cache/.gitignore
 backend/.env
