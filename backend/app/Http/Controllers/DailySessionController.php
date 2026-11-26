@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\RescheduleDailySessionRequest;
 use App\Http\Requests\UpdateDailySessionStatusRequest;
 use App\Models\DailySession;
 use App\Models\UserPlan;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DailySessionController extends Controller
 {
@@ -109,9 +111,9 @@ class DailySessionController extends Controller
             $existing = $weekSessions->get($dateStr);
             $template = $schedulesByDay->get($d);
 
-            $sessionName = $existing?->splitSession?->name
-                ?? $template?->splitSession?->name
-                ?? 'Istirahat';
+            $sessionName = $existing
+                ? ($existing->splitSession?->name ?? 'Istirahat')
+                : ($template?->splitSession?->name ?? 'Istirahat');
 
             $status = $existing?->status
                 ?? ($template?->split_session_id ? 'pending' : 'rest');
@@ -123,6 +125,58 @@ class DailySessionController extends Controller
                 'is_today' => $dateStr === $todayStr,
                 'session_name' => $sessionName,
                 'status' => $status,
+                'rescheduled_from_date' => $existing?->rescheduled_from_date?->toDateString(),
+                'rescheduled_to_date' => $existing?->rescheduled_to_date?->toDateString(),
+                'reschedule_reason' => $existing?->reschedule_reason,
+            ];
+        }
+
+        // Build next 6 upcoming days for the "Geser Jadwal" modal (handles week boundaries cleanly)
+        $upcomingStart = $today->copy()->addDay();
+        $upcomingEnd = $today->copy()->addDays(6);
+        $upcomingExisting = DailySession::query()
+            ->where('user_id', $user->id)
+            ->whereBetween('session_date', [$upcomingStart->toDateString(), $upcomingEnd->toDateString()])
+            ->with('splitSession')
+            ->get()
+            ->keyBy(fn (DailySession $s) => $s->session_date->toDateString());
+
+        $fullDayNames = [
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+            7 => 'Minggu',
+        ];
+
+        $upcomingOptions = [];
+        for ($offset = 1; $offset <= 6; $offset++) {
+            $dObj = $today->copy()->addDays($offset);
+            $dStr = $dObj->toDateString();
+            $iso = $dObj->dayOfWeekIso;
+            $ex = $upcomingExisting->get($dStr);
+            $tpl = $schedulesByDay->get($iso);
+
+            $sName = $ex
+                ? ($ex->splitSession?->name ?? 'Istirahat')
+                : ($tpl?->splitSession?->name ?? 'Istirahat');
+            $isRest = $ex
+                ? ($ex->split_session_id === null || $ex->status === 'rest')
+                : ($tpl?->split_session_id === null);
+            $isLocked = $ex !== null && (
+                $ex->status === 'done'
+                || ($ex->changed_by_role === 'trainer' && $user->role === 'client')
+            );
+
+            $upcomingOptions[] = [
+                'date' => $dStr,
+                'day_short' => $dayLabels[$iso],
+                'day_name' => $fullDayNames[$iso],
+                'session_name' => $sName,
+                'is_rest' => $isRest,
+                'is_locked' => $isLocked,
             ];
         }
 
@@ -131,6 +185,7 @@ class DailySessionController extends Controller
             'has_plan' => true,
             'data' => $dailySession,
             'week_overview' => $weekOverview,
+            'upcoming_options' => $upcomingOptions,
         ]);
     }
 
@@ -218,6 +273,196 @@ class DailySessionController extends Controller
             'status' => 'success',
             'message' => 'Status latihan berhasil diperbarui.',
             'data' => $dailySession,
+        ]);
+    }
+
+    /**
+     * Reschedule a pending workout session to a future date (1-7 days ahead) with a reason,
+     * instead of marking it skipped. If the target date already has a workout, cascades
+     * displaced sessions forward to the next available rest slot.
+     */
+    public function reschedule(RescheduleDailySessionRequest $request, int $id)
+    {
+        $dailySession = DailySession::with('splitSession')->find($id);
+
+        if (!$dailySession) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Sesi harian tidak ditemukan.',
+            ], 404);
+        }
+
+        $user = $request->user();
+
+        if ($dailySession->user_id !== $user->id) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Anda tidak memiliki akses untuk menggeser sesi ini.',
+            ], 403);
+        }
+
+        if ($dailySession->changed_by_role === 'trainer' && $user->role === 'client') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Jadwal hari ini diatur oleh Personal Trainer Anda dan tidak dapat digeser langsung.',
+            ], 409);
+        }
+
+        if (!$dailySession->split_session_id || $dailySession->status === 'rest') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Hari istirahat tidak perlu digeser.',
+            ], 422);
+        }
+
+        if ($dailySession->status === 'done' || $dailySession->workoutLogs()->exists()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Sesi yang sudah selesai atau memiliki catatan set tidak dapat digeser.',
+            ], 422);
+        }
+
+        $originDate = Carbon::parse($dailySession->session_date)->startOfDay();
+        $targetDate = Carbon::createFromFormat('Y-m-d', $request->validated('target_date'))->startOfDay();
+        $reason = trim((string) $request->validated('reason'));
+
+        $diffDays = $originDate->diffInDays($targetDate, false);
+        if ($diffDays < 1 || $diffDays > 7) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Tanggal tujuan harus 1 hingga 7 hari setelah tanggal sesi asal.',
+            ], 422);
+        }
+
+        $activePlan = UserPlan::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->with('schedules')
+            ->latest('id')
+            ->first();
+
+        $schedulesByDay = $activePlan?->schedules?->keyBy('day_of_week') ?? collect();
+
+        $result = DB::transaction(function () use (
+            $dailySession,
+            $user,
+            $originDate,
+            $targetDate,
+            $reason,
+            $activePlan,
+            $schedulesByDay
+        ) {
+            $originDateStr = $originDate->toDateString();
+            $targetDateStr = $targetDate->toDateString();
+            $movingSplitSessionId = $dailySession->split_session_id;
+            $planId = $dailySession->user_plan_id ?? $activePlan?->id;
+
+            // Check if target day is locked (already done or trainer-overridden)
+            $existingTarget = DailySession::query()
+                ->where('user_id', $user->id)
+                ->whereDate('session_date', $targetDateStr)
+                ->first();
+
+            if ($existingTarget && (
+                $existingTarget->status === 'done'
+                || ($existingTarget->changed_by_role === 'trainer' && $user->role === 'client')
+            )) {
+                return ['error' => 'Tanggal tujuan sudah selesai atau diatur oleh Personal Trainer.', 'code' => 422];
+            }
+
+            // Cascade-shift any displaced workouts starting from targetDate (max 7 steps)
+            $carrySplitSessionId = $movingSplitSessionId;
+            $carryFromDate = $originDateStr;
+            $cursor = $targetDate->copy();
+            $shiftedCount = 0;
+
+            for ($step = 0; $step < 7 && $carrySplitSessionId !== null; $step++) {
+                $cursorStr = $cursor->toDateString();
+                $row = DailySession::query()
+                    ->where('user_id', $user->id)
+                    ->whereDate('session_date', $cursorStr)
+                    ->first();
+
+                if ($row) {
+                    if ($row->status === 'done' || ($row->changed_by_role === 'trainer' && $user->role === 'client')) {
+                        // Skip locked day and try next day
+                        $cursor->addDay();
+                        continue;
+                    }
+                    $displacedSplitSessionId = ($row->status !== 'rest') ? $row->split_session_id : null;
+                } else {
+                    $tpl = $schedulesByDay->get($cursor->dayOfWeekIso);
+                    $displacedSplitSessionId = $tpl?->split_session_id;
+                }
+
+                DailySession::updateOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'session_date' => $cursorStr,
+                    ],
+                    [
+                        'user_plan_id' => $planId,
+                        'split_session_id' => $carrySplitSessionId,
+                        'status' => 'pending',
+                        'rescheduled_from_date' => $carryFromDate,
+                        'rescheduled_to_date' => null,
+                        'reschedule_reason' => $reason,
+                        'changed_by' => $user->id,
+                        'changed_by_role' => $user->role,
+                        'completed_at' => null,
+                    ]
+                );
+
+                if ($step > 0) {
+                    $shiftedCount++;
+                }
+
+                $carrySplitSessionId = $displacedSplitSessionId;
+                $carryFromDate = $cursorStr;
+                $cursor->addDay();
+            }
+
+            // Mark origin day as rest (rescheduled, NOT skipped)
+            $dailySession->update([
+                'split_session_id' => null,
+                'status' => 'rest',
+                'rescheduled_to_date' => $targetDateStr,
+                'reschedule_reason' => $reason,
+                'changed_by' => $user->id,
+                'changed_by_role' => $user->role,
+                'completed_at' => null,
+            ]);
+
+            $targetRow = DailySession::query()
+                ->where('user_id', $user->id)
+                ->whereDate('session_date', $targetDateStr)
+                ->with('splitSession')
+                ->first();
+
+            return [
+                'origin' => $dailySession->fresh(['userPlan.split', 'splitSession', 'changedBy:id,name,role']),
+                'target' => $targetRow,
+                'shifted_days_count' => $shiftedCount,
+            ];
+        });
+
+        if (isset($result['error'])) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $result['error'],
+            ], $result['code']);
+        }
+
+        $shiftedNote = $result['shifted_days_count'] > 0
+            ? " ({$result['shifted_days_count']} jadwal berikutnya ikut digeser otomatis)"
+            : '';
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Jadwal berhasil digeser ke {$targetDate->toDateString()}{$shiftedNote}. Hari ini menjadi hari istirahat.",
+            'data' => $result['origin'],
+            'target_session' => $result['target'],
+            'shifted_days_count' => $result['shifted_days_count'],
         ]);
     }
 }

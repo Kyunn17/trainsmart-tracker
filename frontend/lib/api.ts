@@ -715,6 +715,44 @@ export async function updateDailySessionStatus(
   }
 }
 
+export async function rescheduleDailySession(
+  id: number,
+  targetDate: string,
+  reason: string
+): Promise<{
+  success: boolean;
+  message: string;
+  data?: DailySession;
+  shifted_days_count?: number;
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/daily-sessions/${id}/reschedule`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ target_date: targetDate, reason }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      const firstErr = json.errors
+        ? (Object.values(json.errors)[0] as string[])?.[0]
+        : null;
+      return {
+        success: false,
+        message: firstErr || json.message || 'Gagal menggeser jadwal sesi.',
+      };
+    }
+    return {
+      success: true,
+      message: json.message || 'Jadwal berhasil digeser.',
+      data: json.data,
+      shifted_days_count: json.shifted_days_count,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message };
+  }
+}
+
 export async function getWeeklyEvaluation(
   period: 'last_week' | 'current_week' = 'last_week'
 ): Promise<{ success: boolean; data?: WeeklyEvaluationResponse; message?: string }> {

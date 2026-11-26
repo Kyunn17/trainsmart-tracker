@@ -226,8 +226,11 @@ export interface DailySession {
   user_plan_id?: number | null;
   split_session_id?: number | null;
   session_date: string;
+  rescheduled_from_date?: string | null;
+  rescheduled_to_date?: string | null;
   status: DailySessionStatus;
   trainer_note?: string | null;
+  reschedule_reason?: string | null;
   changed_by?: number | null;
   changed_by_role?: string | null;
   changedBy?: { id: number; name: string; role: UserRole } | null;
@@ -244,6 +247,18 @@ export interface WeekOverviewDay {
   is_today: boolean;
   session_name: string;
   status: DailySessionStatus;
+  rescheduled_from_date?: string | null;
+  rescheduled_to_date?: string | null;
+  reschedule_reason?: string | null;
+}
+
+export interface UpcomingScheduleOption {
+  date: string;
+  day_short: string;
+  day_name: string;
+  session_name: string;
+  is_rest: boolean;
+  is_locked: boolean;
 }
 
 export interface TodaySessionResponse {
@@ -251,6 +266,7 @@ export interface TodaySessionResponse {
   has_plan: boolean;
   data: DailySession | null;
   week_overview: WeekOverviewDay[];
+  upcoming_options?: UpcomingScheduleOption[];
 }
 
 export interface WeeklyEvaluationSuggestion {

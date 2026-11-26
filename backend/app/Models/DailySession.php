@@ -13,8 +13,11 @@ class DailySession extends Model
         'user_plan_id',
         'split_session_id',
         'session_date',
+        'rescheduled_from_date',
+        'rescheduled_to_date',
         'status',
         'trainer_note',
+        'reschedule_reason',
         'changed_by',
         'changed_by_role',
         'completed_at',
@@ -24,6 +27,8 @@ class DailySession extends Model
     {
         return [
             'session_date' => 'date:Y-m-d',
+            'rescheduled_from_date' => 'date:Y-m-d',
+            'rescheduled_to_date' => 'date:Y-m-d',
             'completed_at' => 'datetime',
         ];
     }

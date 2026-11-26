@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   BarChart3,
+  CalendarClock,
   CalendarRange,
   CheckCircle2,
   ChevronRight,
@@ -19,12 +20,14 @@ import {
   Sparkles,
   StickyNote,
   Users,
+  X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
   getClientMyProgress,
   getExerciseDetail,
   getTodaySession,
+  rescheduleDailySession,
   updateDailySessionStatus,
 } from "@/lib/api";
 import {
@@ -76,7 +79,22 @@ export default function TodayDashboardSection() {
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusSuccess, setStatusSuccess] = useState<string | null>(null);
   const [detailExercise, setDetailExercise] = useState<Exercise | null>(null);
+
+  // Reschedule ("Geser Jadwal") modal state
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
+  const [rescheduleReason, setRescheduleReason] = useState("");
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+
+  const QUICK_RESCHEDULE_REASONS = [
+    "Sakit / kurang fit",
+    "Sibuk kerja / kuliah",
+    "Otot masih pegal (butuh recovery)",
+    "Urusan keluarga / mendadak",
+  ];
 
   useEffect(() => {
     if (!user || user.role !== "client") return;
@@ -102,6 +120,7 @@ export default function TodayDashboardSection() {
     if (!todayData?.data) return;
     setIsUpdatingStatus(true);
     setStatusError(null);
+    setStatusSuccess(null);
     const res = await updateDailySessionStatus(todayData.data.id, nextStatus);
     setIsUpdatingStatus(false);
 
@@ -110,6 +129,42 @@ export default function TodayDashboardSection() {
       return;
     }
 
+    const refreshed = await getTodaySession();
+    if (refreshed) setTodayData(refreshed);
+  };
+
+  const openRescheduleModal = () => {
+    const firstAvailable =
+      todayData?.upcoming_options?.find((opt) => !opt.is_locked && opt.is_rest) ||
+      todayData?.upcoming_options?.find((opt) => !opt.is_locked);
+    setRescheduleDate(firstAvailable?.date || "");
+    setRescheduleReason("");
+    setRescheduleError(null);
+    setIsRescheduleOpen(true);
+  };
+
+  const handleRescheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!todayData?.data || !rescheduleDate) return;
+    setIsRescheduling(true);
+    setRescheduleError(null);
+    setStatusError(null);
+    setStatusSuccess(null);
+
+    const res = await rescheduleDailySession(
+      todayData.data.id,
+      rescheduleDate,
+      rescheduleReason.trim()
+    );
+    setIsRescheduling(false);
+
+    if (!res.success) {
+      setRescheduleError(res.message);
+      return;
+    }
+
+    setIsRescheduleOpen(false);
+    setStatusSuccess(res.message);
     const refreshed = await getTodaySession();
     if (refreshed) setTodayData(refreshed);
   };
@@ -358,6 +413,17 @@ export default function TodayDashboardSection() {
                         <CheckCircle2 className="w-4 h-4" />
                         <span>Tandai Selesai</span>
                       </button>
+                      {splitSession && (
+                        <button
+                          type="button"
+                          onClick={openRescheduleModal}
+                          disabled={isUpdatingStatus}
+                          className="h-11 px-4 bg-[#FFFBEB] hover:bg-[#FEF3C7] text-[#B45309] border border-[#FDE68A] disabled:opacity-50 font-semibold rounded-xl text-xs sm:text-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <CalendarClock className="w-4 h-4" />
+                          <span>Geser Jadwal</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleStatusChange("skipped")}
@@ -399,6 +465,34 @@ export default function TodayDashboardSection() {
                         "Status latihan hari ini telah disesuaikan oleh pelatih Anda."}
                     </p>
                   </div>
+                </div>
+              )}
+
+              {/* Reschedule Info Banner */}
+              {(daily.rescheduled_to_date || daily.rescheduled_from_date) && (
+                <div className="p-4 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl flex items-start gap-3">
+                  <CalendarClock className="w-5 h-5 text-[#B45309] shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <span className="font-bold text-[#B45309] block">
+                      {daily.rescheduled_to_date
+                        ? `Jadwal Hari Ini Digeser ke ${daily.rescheduled_to_date}`
+                        : `Sesi Pindahan dari ${daily.rescheduled_from_date}`}
+                    </span>
+                    {daily.reschedule_reason && (
+                      <p className="text-[#141916] mt-0.5">
+                        Alasan: {daily.reschedule_reason}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {statusSuccess && (
+                <div
+                  role="status"
+                  className="p-3.5 bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl text-xs sm:text-sm text-[#047857] font-medium"
+                >
+                  {statusSuccess}
                 </div>
               )}
 
@@ -595,6 +689,146 @@ export default function TodayDashboardSection() {
           )}
         </div>
       </section>
+
+      {/* Reschedule ("Geser Jadwal") Modal */}
+      {isRescheduleOpen && todayData?.data && (
+        <div
+          className="fixed inset-0 bg-[#141916]/65 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reschedule-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsRescheduleOpen(false);
+          }}
+        >
+          <div className="bg-white border border-[#DCE1D8] rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl relative space-y-4">
+            <button
+              type="button"
+              onClick={() => setIsRescheduleOpen(false)}
+              className="absolute top-4 right-4 h-10 w-10 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#48524C] rounded-xl flex items-center justify-center cursor-pointer"
+              aria-label="Tutup modal geser jadwal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div>
+              <h2
+                id="reschedule-modal-title"
+                className="text-xl font-bold text-[#141916] pr-10 flex items-center gap-2"
+              >
+                <CalendarClock className="w-5 h-5 text-[#B45309]" />
+                <span>Geser Jadwal Latihan</span>
+              </h2>
+              <p className="text-xs text-[#48524C] mt-1">
+                Pindahkan sesi{" "}
+                <strong className="text-[#141916]">
+                  {todayData.data.split_session?.name}
+                </strong>{" "}
+                ke hari lain tanpa menandainya sebagai dilewati (skip). Hari ini akan menjadi hari istirahat.
+              </p>
+            </div>
+
+            {rescheduleError && (
+              <div className="p-3 bg-[#FFF1F2] border border-[#FECDD3] rounded-xl text-xs text-[#BE123C]">
+                {rescheduleError}
+              </div>
+            )}
+
+            <form onSubmit={handleRescheduleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#141916] mb-2">
+                  Pilih Tanggal Tujuan <span className="text-[#BE123C]">*</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {(todayData.upcoming_options || []).map((opt) => {
+                    const selected = rescheduleDate === opt.date;
+                    return (
+                      <button
+                        key={opt.date}
+                        type="button"
+                        disabled={opt.is_locked}
+                        onClick={() => setRescheduleDate(opt.date)}
+                        className={`p-3 rounded-xl border text-left transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                          selected
+                            ? "bg-[#FFF1EA] border-[#C84B11]"
+                            : "bg-[#F5F6F3] border-[#DCE1D8] hover:border-[#C5CCC0]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-[#141916]">
+                            {opt.day_name}
+                          </span>
+                          <span className="text-[11px] font-mono tabular-nums text-[#626E67]">
+                            {opt.date}
+                          </span>
+                        </div>
+                        <p className="text-xs mt-1 text-[#48524C]">
+                          {opt.is_rest
+                            ? "Hari Istirahat (Slot kosong)"
+                            : `Terisi: ${opt.session_name} (akan ikut bergeser)`}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#141916] mb-1.5">
+                  Alasan Geser Jadwal <span className="text-[#BE123C]">*</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {QUICK_RESCHEDULE_REASONS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setRescheduleReason(preset)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-colors ${
+                        rescheduleReason === preset
+                          ? "bg-[#141916] text-white border-[#141916]"
+                          : "bg-[#F5F6F3] text-[#48524C] border-[#DCE1D8] hover:text-[#141916]"
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  required
+                  minLength={3}
+                  maxLength={255}
+                  placeholder="Tulis alasan Anda (misal: sedang demam / lembur kantor)..."
+                  value={rescheduleReason}
+                  onChange={(e) => setRescheduleReason(e.target.value)}
+                  className="w-full h-11 px-3.5 bg-white border border-[#C5CCC0] focus:border-[#C84B11] rounded-xl text-sm outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsRescheduleOpen(false)}
+                  className="h-11 px-4 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#141916] font-semibold rounded-xl text-sm cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    isRescheduling ||
+                    !rescheduleDate ||
+                    rescheduleReason.trim().length < 3
+                  }
+                  className="h-11 px-5 bg-[#C84B11] hover:bg-[#A83D0B] disabled:opacity-50 text-white font-semibold rounded-xl text-sm cursor-pointer"
+                >
+                  {isRescheduling ? "Menggeser..." : "Konfirmasi Geser Jadwal"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <ExerciseDetailModal
         exercise={detailExercise}

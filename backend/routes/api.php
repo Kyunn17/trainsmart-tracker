@@ -71,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/daily-sessions/today', [DailySessionController::class, 'today']);
     Route::get('/daily-sessions/{id}', [DailySessionController::class, 'show'])->whereNumber('id');
     Route::patch('/daily-sessions/{id}/status', [DailySessionController::class, 'updateStatus'])->whereNumber('id');
+    Route::post('/daily-sessions/{id}/reschedule', [DailySessionController::class, 'reschedule'])->whereNumber('id');
     Route::get('/evaluation/weekly', [EvaluationController::class, 'weekly']);
 
     // --- 4. Trainer Routes (Personal Trainer & Admin) ---
