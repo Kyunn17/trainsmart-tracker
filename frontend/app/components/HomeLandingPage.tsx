@@ -102,7 +102,7 @@ export default function HomeLandingPage() {
             aria-hidden="true"
           />
 
-          <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+          <div className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-28 pb-16 sm:pt-32 sm:pb-20">
             <div className="max-w-2xl space-y-6">
               <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-white leading-[1.12]">
                 Latihan Gym Lebih Terarah, Terukur, dan Ramah Pemula.

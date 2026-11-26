@@ -28,6 +28,16 @@ export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
   const isAuthPage = pathname === "/login" || pathname === "/register";
@@ -120,19 +130,36 @@ export default function AppShell({ children }: AppShellProps) {
 
   // Guest / Auth Page Layout (minimal top header, no sidebar)
   if (!showSidebar) {
+    const isHome = pathname === "/";
+    const headerClass = isHome
+      ? isScrolled
+        ? "bg-[#141916]/90 backdrop-blur-md border-b border-white/10 text-white shadow-md"
+        : "bg-transparent border-b border-white/10 text-white"
+      : "bg-white/80 backdrop-blur-md border-b border-[#DCE1D8] text-[#141916]";
+
     return (
       <div className="min-h-screen flex flex-col bg-[#F5F6F3] text-[#141916]">
-        <header className="sticky top-0 z-40 w-full border-b border-[#DCE1D8] bg-white">
+        <header
+          className={`fixed top-0 left-0 right-0 z-40 w-full transition-all duration-200 ${headerClass}`}
+        >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center gap-3 group shrink-0">
               <div className="w-10 h-10 rounded-xl bg-[#C84B11] group-hover:bg-[#A83D0B] flex items-center justify-center text-white transition-colors shadow-xs">
                 <Dumbbell className="w-5 h-5" />
               </div>
               <div className="flex flex-col">
-                <span className="font-bold text-base tracking-tight text-[#141916] leading-tight">
+                <span
+                  className={`font-bold text-base tracking-tight leading-tight transition-colors ${
+                    isHome ? "text-white" : "text-[#141916]"
+                  }`}
+                >
                   TrainSmart
                 </span>
-                <span className="text-xs text-[#626E67] leading-tight hidden sm:block">
+                <span
+                  className={`text-xs leading-tight hidden sm:block transition-colors ${
+                    isHome ? "text-[#D1D7CD]" : "text-[#626E67]"
+                  }`}
+                >
                   Panduan Latihan & Hipertrofi
                 </span>
               </div>
@@ -142,13 +169,19 @@ export default function AppShell({ children }: AppShellProps) {
               <div className="flex items-center gap-2">
                 <Link
                   href="/login"
-                  className={`h-10 px-4 rounded-xl text-sm font-semibold flex items-center gap-1.5 border transition-colors whitespace-nowrap ${
-                    pathname === "/login"
+                  className={`h-10 px-4 rounded-xl text-sm font-semibold flex items-center gap-1.5 border transition-all whitespace-nowrap ${
+                    isHome
+                      ? "bg-white/10 hover:bg-white/20 border-white/25 text-white backdrop-blur-sm"
+                      : pathname === "/login"
                       ? "bg-[#ECEFE9] border-[#C5CCC0] text-[#141916]"
                       : "bg-white hover:bg-[#ECEFE9] border-[#C5CCC0] text-[#141916]"
                   }`}
                 >
-                  <LogIn className="w-4 h-4 text-[#48524C]" />
+                  <LogIn
+                    className={`w-4 h-4 ${
+                      isHome ? "text-white" : "text-[#48524C]"
+                    }`}
+                  />
                   <span>Masuk</span>
                 </Link>
                 <Link
@@ -162,7 +195,9 @@ export default function AppShell({ children }: AppShellProps) {
           </div>
         </header>
 
-        <div className="flex-1 flex flex-col">{children}</div>
+        <div className={`flex-1 flex flex-col ${isHome ? "" : "pt-16"}`}>
+          {children}
+        </div>
       </div>
     );
   }
