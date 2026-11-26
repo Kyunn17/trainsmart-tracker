@@ -56,6 +56,7 @@ export interface Exercise {
   is_active?: boolean;
   images?: ExerciseImage[];
   pivot?: ExercisePivot;
+  split_sessions?: SplitSession[];
   targetSets?: number;
   setsData?: SetData[];
   workout_logs?: WorkoutLogEntry[];
@@ -123,4 +124,26 @@ export interface ClientProgressResponse {
   client: User;
   summary: ClientProgressSummary;
   data: WorkoutLogEntry[];
+}
+
+export interface ExerciseFilters {
+  search?: string;
+  muscle?: string;
+  equipment?: string;
+  difficulty?: string;
+  beginner_only?: boolean;
+  session_type?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface PaginatedExercisesResponse {
+  status: string;
+  data: Exercise[];
+  meta: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
 }

@@ -1,4 +1,13 @@
-import { Category, WorkoutLogEntry, User, ClientProgressResponse, Split } from '@/types/workout';
+import {
+  Category,
+  WorkoutLogEntry,
+  User,
+  ClientProgressResponse,
+  Split,
+  Exercise,
+  ExerciseFilters,
+  PaginatedExercisesResponse,
+} from '@/types/workout';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -469,6 +478,70 @@ export async function getSplitById(id: number): Promise<Split | null> {
     return json.data || null;
   } catch (err) {
     console.error(`Error fetching split #${id}:`, err);
+    return null;
+  }
+}
+
+/* ========================================================================= */
+/* EXERCISE LIBRARY APIS                                                     */
+/* ========================================================================= */
+
+export async function getExercises(
+  filters: ExerciseFilters = {}
+): Promise<PaginatedExercisesResponse> {
+  const params = new URLSearchParams();
+  if (filters.search?.trim()) params.set('search', filters.search.trim());
+  if (filters.muscle) params.set('muscle', filters.muscle);
+  if (filters.equipment) params.set('equipment', filters.equipment);
+  if (filters.difficulty) params.set('difficulty', filters.difficulty);
+  if (filters.beginner_only) params.set('beginner_only', '1');
+  if (filters.session_type) params.set('session_type', filters.session_type);
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.per_page) params.set('per_page', String(filters.per_page));
+
+  const queryString = params.toString();
+  const url = queryString
+    ? `${API_BASE}/exercises?${queryString}`
+    : `${API_BASE}/exercises`;
+
+  try {
+    const res = await fetch(url, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || 'Gagal memuat daftar gerakan.');
+    }
+    return {
+      status: json.status || 'success',
+      data: json.data || [],
+      meta: json.meta || {
+        current_page: 1,
+        last_page: 1,
+        per_page: 24,
+        total: 0,
+      },
+    };
+  } catch (err) {
+    console.error('Error fetching exercises:', err);
+    throw err;
+  }
+}
+
+export async function getExerciseDetail(
+  idOrSlug: string | number
+): Promise<Exercise | null> {
+  try {
+    const res = await fetch(`${API_BASE}/exercises/${idOrSlug}`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data || null;
+  } catch (err) {
+    console.error(`Error fetching exercise ${idOrSlug}:`, err);
     return null;
   }
 }

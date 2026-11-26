@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Award,
   LayoutGrid,
+  BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -40,6 +41,12 @@ export default function Navbar() {
       href: "/",
       label: "Dashboard",
       icon: <LayoutGrid className="w-4 h-4" />,
+      activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+    },
+    {
+      href: "/exercises",
+      label: "Gerakan",
+      icon: <BookOpen className="w-4 h-4" />,
       activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
     },
   ];
