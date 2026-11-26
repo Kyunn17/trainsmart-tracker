@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowLeft,
@@ -67,6 +68,7 @@ const STEPS = [
 ];
 
 export default function OnboardingPage() {
+  const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
 
   const [step, setStep] = useState(1);
@@ -86,15 +88,19 @@ export default function OnboardingPage() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [savedWarnings, setSavedWarnings] = useState<ScheduleWarning[]>([]);
 
-  // Check if logged-in user already has an active plan
+  // Redirect unauthenticated users to login; fetch active plan when signed in
   useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace("/login");
+      return;
+    }
     if (!user) return;
     getUserPlan().then((res) => {
       if (res.success && res.data) {
         setExistingPlan(res.data);
       }
     });
-  }, [user]);
+  }, [user, authLoading, router]);
 
   const loadRecommendations = async (days: number) => {
     setIsLoadingRecs(true);

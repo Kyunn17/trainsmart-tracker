@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Award,
   CheckCircle2,
@@ -31,7 +32,8 @@ function getInitials(name: string) {
 }
 
 export default function SelectTrainerPage() {
-  const { user, chooseTrainer } = useAuth();
+  const router = useRouter();
+  const { user, isLoading: authLoading, chooseTrainer } = useAuth();
   const [trainers, setTrainers] = useState<User[]>([]);
   const [requests, setRequests] = useState<CoachingRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +47,11 @@ export default function SelectTrainerPage() {
   );
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
     let active = true;
     Promise.all([getTrainers(), getClientCoachingRequests()]).then(
       ([tData, rData]) => {
@@ -57,7 +64,7 @@ export default function SelectTrainerPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user, authLoading, router]);
 
   const handleUnassign = async () => {
     setIsUpdating(-1);

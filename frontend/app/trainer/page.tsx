@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Users,
   UserPlus,
@@ -38,7 +40,8 @@ import {
 } from "@/types/workout";
 
 export default function TrainerDashboard() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
   const [clients, setClients] = useState<User[]>([]);
   const [requests, setRequests] = useState<CoachingRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,6 +87,14 @@ export default function TrainerDashboard() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    if (user.role !== "trainer" && user.role !== "admin") {
+      return;
+    }
     let active = true;
     Promise.all([getTrainerClients(), getTrainerCoachingRequests()]).then(
       ([cData, rData]) => {
@@ -96,7 +107,7 @@ export default function TrainerDashboard() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -202,6 +213,27 @@ export default function TrainerDashboard() {
   };
 
   const pendingRequests = requests.filter((r) => r.status === "pending");
+
+  if (!authLoading && user && user.role !== "trainer" && user.role !== "admin") {
+    return (
+      <main className="flex-1 bg-[#F5F6F3] text-[#141916] flex items-center justify-center p-6">
+        <div className="max-w-md w-full p-8 bg-white border border-[#DCE1D8] rounded-2xl text-center shadow-xs">
+          <h1 className="text-xl font-bold text-[#141916] mb-2">
+            Akses Terbatas: Khusus Trainer
+          </h1>
+          <p className="text-[#48524C] text-sm mb-6">
+            Halaman ini hanya tersedia untuk akun Personal Trainer atau Admin.
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center w-full h-11 bg-[#C84B11] hover:bg-[#A83D0B] text-white rounded-xl text-sm font-semibold"
+          >
+            Kembali ke Dashboard
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 bg-[#F5F6F3] text-[#141916]">

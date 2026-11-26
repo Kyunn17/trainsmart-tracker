@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ShieldAlert,
   Users,
@@ -33,7 +34,8 @@ interface AdminStats {
 }
 
 export default function AdminPanelPage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [allTrainers, setAllTrainers] = useState<User[]>([]);
@@ -56,6 +58,14 @@ export default function AdminPanelPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    if (user.role !== "admin") {
+      return;
+    }
     let active = true;
     const roleParam = selectedRoleFilter === "all" ? undefined : selectedRoleFilter;
     Promise.all([
@@ -72,7 +82,7 @@ export default function AdminPanelPage() {
     return () => {
       active = false;
     };
-  }, [selectedRoleFilter]);
+  }, [selectedRoleFilter, user, authLoading, router]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -112,7 +122,15 @@ export default function AdminPanelPage() {
     }
   };
 
-  if (user?.role !== "admin") {
+  if (authLoading || !user) {
+    return (
+      <main className="flex-1 bg-[#F5F6F3] text-[#141916] p-6">
+        <div className="max-w-6xl mx-auto h-40 bg-white border border-[#DCE1D8] rounded-2xl animate-pulse" />
+      </main>
+    );
+  }
+
+  if (user.role !== "admin") {
     return (
       <main className="flex-1 bg-[#F5F6F3] text-[#141916] flex items-center justify-center p-6">
         <div className="max-w-md w-full p-8 bg-white border border-[#DCE1D8] rounded-2xl text-center shadow-xs">

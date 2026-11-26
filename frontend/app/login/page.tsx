@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dumbbell, Lock, Mail, ArrowRight, AlertCircle } from "lucide-react";
@@ -8,12 +8,24 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { user, isLoading: authLoading, login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      const target =
+        user.role === "admin"
+          ? "/admin"
+          : user.role === "trainer"
+          ? "/trainer"
+          : "/";
+      router.replace(target);
+    }
+  }, [user, authLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +41,10 @@ export default function LoginPage() {
     setIsLoading(false);
 
     if (res.success) {
-      router.push("/");
+      const role = res.user?.role;
+      router.push(
+        role === "admin" ? "/admin" : role === "trainer" ? "/trainer" : "/"
+      );
     } else {
       setError(res.message || "Email atau kata sandi tidak cocok.");
     }

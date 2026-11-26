@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   AlertTriangle,
@@ -46,6 +47,7 @@ const STATUS_BADGE: Record<
 };
 
 export default function WeeklyEvaluationPage() {
+  const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
   const [period, setPeriod] = useState<"last_week" | "current_week">(
     "last_week"
@@ -64,7 +66,7 @@ export default function WeeklyEvaluationPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      Promise.resolve().then(() => setIsLoading(false));
+      router.replace("/login");
       return;
     }
 
@@ -86,7 +88,7 @@ export default function WeeklyEvaluationPage() {
     return () => {
       active = false;
     };
-  }, [user, authLoading, period, reloadTick]);
+  }, [user, authLoading, period, reloadTick, router]);
 
   if (!authLoading && !user) {
     return (

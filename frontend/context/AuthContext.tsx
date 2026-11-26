@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { User, UserRole } from "@/types/workout";
+import { useRouter } from "next/navigation";
+import { User } from "@/types/workout";
 import { 
   apiLogin, 
   apiRegister, 
@@ -14,8 +15,8 @@ import {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, pass: string) => Promise<{ success: boolean; message?: string }>;
-  register: (payload: any) => Promise<{ success: boolean; message?: string; errors?: any }>;
+  login: (email: string, pass: string) => Promise<{ success: boolean; message?: string; user?: User }>;
+  register: (payload: Record<string, unknown>) => Promise<{ success: boolean; message?: string; errors?: unknown; user?: User }>;
   logout: () => Promise<void>;
   chooseTrainer: (trainerId: number | null) => Promise<{ success: boolean; message: string }>;
   refreshUser: () => Promise<void>;
@@ -24,6 +25,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -46,16 +48,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await apiLogin({ email, password: pass });
     if (res.success && res.user) {
       setUser(res.user);
-      return { success: true, message: res.message };
+      return { success: true, message: res.message, user: res.user };
     }
     return { success: false, message: res.message || "Login gagal" };
   };
 
-  const register = async (payload: any) => {
-    const res = await apiRegister(payload);
+  const register = async (payload: Record<string, unknown>) => {
+    const res = await apiRegister(payload as Parameters<typeof apiRegister>[0]);
     if (res.success && res.user) {
       setUser(res.user);
-      return { success: true, message: res.message };
+      return { success: true, message: res.message, user: res.user };
     }
     return { success: false, message: res.message || "Registrasi gagal", errors: res.errors };
   };
@@ -63,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     await apiLogout();
     setUser(null);
+    router.push("/login");
   };
 
   const chooseTrainer = async (trainerId: number | null) => {

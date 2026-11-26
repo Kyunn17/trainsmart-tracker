@@ -19,9 +19,10 @@ import { User as UserType } from "@/types/workout";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register } = useAuth();
+  const { user, isLoading: authLoading, register } = useAuth();
 
   const [role, setRole] = useState<"client" | "trainer">("client");
+  const [justRegistered, setJustRegistered] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,6 +34,18 @@ export default function RegisterPage() {
   const [availableTrainers, setAvailableTrainers] = useState<UserType[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user && !justRegistered) {
+      const target =
+        user.role === "admin"
+          ? "/admin"
+          : user.role === "trainer"
+          ? "/trainer"
+          : "/";
+      router.replace(target);
+    }
+  }, [user, authLoading, justRegistered, router]);
 
   useEffect(() => {
     getTrainers().then(setAvailableTrainers);
@@ -66,7 +79,8 @@ export default function RegisterPage() {
     setIsLoading(false);
 
     if (res.success) {
-      router.push(role === "client" ? "/onboarding" : "/");
+      setJustRegistered(true);
+      router.push(role === "client" ? "/onboarding" : "/trainer");
     } else {
       setError(res.message || "Gagal melakukan registrasi.");
     }

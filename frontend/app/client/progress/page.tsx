@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Dumbbell,
   Flame,
@@ -10,6 +11,7 @@ import {
   StickyNote,
   TrendingUp,
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { getClientMyProgress } from "@/lib/api";
 import { WorkoutLogEntry, User } from "@/types/workout";
 
@@ -24,6 +26,8 @@ function getRirBadgeStyle(rir: number | null | undefined) {
 }
 
 export default function ClientProgressPage() {
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
   const [data, setData] = useState<{
     summary: {
       total_sets: number;
@@ -36,11 +40,21 @@ export default function ClientProgressPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    let active = true;
     getClientMyProgress().then((res) => {
+      if (!active) return;
       setData(res);
       setIsLoading(false);
     });
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [user, authLoading, router]);
 
   return (
     <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
