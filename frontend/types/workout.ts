@@ -147,3 +147,38 @@ export interface PaginatedExercisesResponse {
     total: number;
   };
 }
+
+export interface PlanScheduleItem {
+  id?: number;
+  user_plan_id?: number;
+  day_of_week: number; // 1 = Senin .. 7 = Minggu
+  split_session_id: number | null;
+  split_session?: SplitSession | null;
+}
+
+export interface ScheduleWarning {
+  code: string;
+  severity: "warning" | "info";
+  message: string;
+  days: number[];
+}
+
+export interface UserPlan {
+  id: number;
+  user_id: number;
+  split_id: number;
+  days_per_week: number;
+  is_active: boolean;
+  onboarding_completed_at?: string | null;
+  split?: Split;
+  schedules?: PlanScheduleItem[];
+}
+
+export interface SaveUserPlanPayload {
+  split_id: number;
+  days_per_week: number;
+  schedule: Array<{
+    day_of_week: number;
+    split_session_id: number | null;
+  }>;
+}

@@ -34,11 +34,16 @@ class SplitController extends Controller
      */
     public function show(int $id)
     {
+        $includeAll = request()->boolean('all_exercises');
+
         $split = Split::query()
             ->where('is_active', true)
             ->with([
-                'sessions.exercises' => function ($query) {
+                'sessions.exercises' => function ($query) use ($includeAll) {
                     $query->where('exercises.is_active', true)
+                        ->when(!$includeAll, function ($q) {
+                            $q->where('exercise_split_session.is_default_recommended', true);
+                        })
                         ->with('images');
                 },
             ])

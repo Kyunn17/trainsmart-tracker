@@ -66,7 +66,7 @@ export default function RegisterPage() {
     setIsLoading(false);
 
     if (res.success) {
-      router.push("/");
+      router.push(role === "client" ? "/onboarding" : "/");
     } else {
       setError(res.message || "Gagal melakukan registrasi.");
     }

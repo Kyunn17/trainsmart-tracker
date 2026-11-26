@@ -12,6 +12,7 @@ import {
   Award,
   LayoutGrid,
   BookOpen,
+  CalendarRange,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -71,6 +72,12 @@ export default function Navbar() {
 
   if (user?.role === "client") {
     navItems.push(
+      {
+        href: "/onboarding",
+        label: "Atur Jadwal",
+        icon: <CalendarRange className="w-4 h-4" />,
+        activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+      },
       {
         href: "/client/trainer",
         label: user.trainer ? `Trainer (${user.trainer.name.split(" ")[0]})` : "Pilih Trainer",

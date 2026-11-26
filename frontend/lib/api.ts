@@ -7,6 +7,9 @@ import {
   Exercise,
   ExerciseFilters,
   PaginatedExercisesResponse,
+  UserPlan,
+  ScheduleWarning,
+  SaveUserPlanPayload,
 } from '@/types/workout';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -543,5 +546,91 @@ export async function getExerciseDetail(
   } catch (err) {
     console.error(`Error fetching exercise ${idOrSlug}:`, err);
     return null;
+  }
+}
+
+/* ========================================================================= */
+/* USER PLAN & WEEKLY SCHEDULE BUILDER APIS                                  */
+/* ========================================================================= */
+
+export async function getUserPlan(): Promise<{
+  success: boolean;
+  data: UserPlan | null;
+  warnings: ScheduleWarning[];
+  message?: string;
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/user/plan`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        data: null,
+        warnings: [],
+        message: json.message || 'Gagal memuat rencana latihan.',
+      };
+    }
+    return {
+      success: true,
+      data: json.data || null,
+      warnings: json.warnings || [],
+    };
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, data: null, warnings: [], message };
+  }
+}
+
+export async function saveUserPlan(payload: SaveUserPlanPayload): Promise<{
+  success: boolean;
+  message: string;
+  data?: UserPlan;
+  warnings: ScheduleWarning[];
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/user/plan`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        message: json.message || 'Gagal menyimpan jadwal latihan.',
+        warnings: [],
+      };
+    }
+    return {
+      success: true,
+      message: json.message || 'Rencana latihan berhasil disimpan.',
+      data: json.data,
+      warnings: json.warnings || [],
+    };
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message, warnings: [] };
+  }
+}
+
+export async function validateUserSchedule(
+  payload: SaveUserPlanPayload
+): Promise<ScheduleWarning[]> {
+  try {
+    const res = await fetch(`${API_BASE}/user/plan/validate-schedule`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.warnings || [];
+  } catch {
+    return [];
   }
 }

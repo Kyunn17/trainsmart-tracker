@@ -8,6 +8,7 @@ use App\Http\Controllers\TrainerController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ExerciseController;
 use App\Http\Controllers\SplitController;
+use App\Http\Controllers\UserPlanController;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,6 +45,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Client-specific actions
     Route::post('/client/select-trainer', [ClientController::class, 'selectTrainer']);
     Route::get('/client/my-progress', [ClientController::class, 'myProgress']);
+
+    // User Plan & Weekly Schedule Builder
+    Route::get('/user/plan', [UserPlanController::class, 'show']);
+    Route::post('/user/plan', [UserPlanController::class, 'store']);
+    Route::post('/user/plan/validate-schedule', [UserPlanController::class, 'validateSchedule']);
 
     // --- 4. Trainer Routes (Personal Trainer & Admin) ---
     Route::middleware('role:trainer,admin')->prefix('trainer')->group(function () {
