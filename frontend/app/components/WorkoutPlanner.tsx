@@ -1064,7 +1064,7 @@ export default function WorkoutPlanner({
         /* ========================================================================= */
         <div className="space-y-5">
           {/* Sticky Live Session Bar */}
-          <div className="sticky top-16 md:top-[68px] z-30 bg-white border border-[#DCE1D8] rounded-2xl p-4 shadow-sm space-y-3">
+          <div className="sticky top-14 lg:top-4 z-30 bg-white border border-[#DCE1D8] rounded-2xl p-4 shadow-sm space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[#FFF1EA] border border-[#F4C4AC] text-[#C84B11] flex items-center justify-center shrink-0">
