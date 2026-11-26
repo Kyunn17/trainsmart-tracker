@@ -14,6 +14,10 @@ import {
   DailySessionStatus,
   TodaySessionResponse,
   WeeklyEvaluationResponse,
+  CoachingRequest,
+  TrainerClientTodayResponse,
+  AdminExercisePayload,
+  ExerciseImage,
 } from '@/types/workout';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -729,5 +733,290 @@ export async function getWeeklyEvaluation(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
     return { success: false, message };
+  }
+}
+
+/* ========================================================================= */
+/* PHASE 7: COACHING REQUESTS & TRAINER DAILY OVERRIDE                       */
+/* ========================================================================= */
+
+export async function getClientCoachingRequests(): Promise<CoachingRequest[]> {
+  try {
+    const res = await fetch(`${API_BASE}/client/coaching-requests`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function createCoachingRequest(
+  trainerId: number,
+  message?: string
+): Promise<{ success: boolean; message: string; data?: CoachingRequest }> {
+  try {
+    const res = await fetch(`${API_BASE}/client/coaching-requests`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ trainer_id: trainerId, message: message || null }),
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Permintaan bimbingan diproses.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function getTrainerCoachingRequests(): Promise<CoachingRequest[]> {
+  try {
+    const res = await fetch(`${API_BASE}/trainer/coaching-requests`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function respondCoachingRequest(
+  requestId: number,
+  status: 'accepted' | 'rejected'
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/trainer/coaching-requests/${requestId}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Permintaan berhasil diperbarui.',
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function getTrainerClientToday(
+  clientId: number
+): Promise<TrainerClientTodayResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/trainer/clients/${clientId}/today`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function overrideTrainerClientDailySession(
+  clientId: number,
+  date: string,
+  status: DailySessionStatus,
+  trainerNote: string
+): Promise<{ success: boolean; message: string; data?: DailySession }> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/trainer/clients/${clientId}/daily-sessions/${date}`,
+      {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ status, trainer_note: trainerNote }),
+      }
+    );
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Status harian klien diperbarui.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message: msg };
+  }
+}
+
+/* ========================================================================= */
+/* PHASE 8: ADMIN EXERCISE & SPLIT MANAGEMENT                                */
+/* ========================================================================= */
+
+export async function getAdminExercises(params: {
+  search?: string;
+  muscle?: string;
+  status?: 'all' | 'active' | 'inactive';
+  page?: number;
+  per_page?: number;
+} = {}): Promise<PaginatedExercisesResponse> {
+  const qs = new URLSearchParams();
+  if (params.search?.trim()) qs.set('search', params.search.trim());
+  if (params.muscle) qs.set('muscle', params.muscle);
+  if (params.status) qs.set('status', params.status);
+  if (params.page) qs.set('page', String(params.page));
+  if (params.per_page) qs.set('per_page', String(params.per_page));
+
+  const res = await fetch(`${API_BASE}/admin/exercises?${qs.toString()}`, {
+    headers: authHeaders(),
+    cache: 'no-store',
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.message || 'Gagal memuat gerakan admin.');
+  }
+  return {
+    status: 'success',
+    data: json.data || [],
+    meta: json.meta || { current_page: 1, last_page: 1, per_page: 20, total: 0 },
+  };
+}
+
+export async function createAdminExercise(
+  payload: AdminExercisePayload
+): Promise<{ success: boolean; message: string; data?: Exercise }> {
+  try {
+    const res = await fetch(`${API_BASE}/admin/exercises`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Gerakan diproses.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function updateAdminExercise(
+  id: number,
+  payload: Partial<AdminExercisePayload>
+): Promise<{ success: boolean; message: string; data?: Exercise }> {
+  try {
+    const res = await fetch(`${API_BASE}/admin/exercises/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Gerakan diperbarui.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function uploadAdminExerciseImage(
+  exerciseId: number,
+  file: File,
+  position: 0 | 1,
+  altText?: string
+): Promise<{ success: boolean; message: string; data?: ExerciseImage }> {
+  try {
+    const token = getAuthToken();
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('position', String(position));
+    if (altText) formData.append('alt_text', altText);
+
+    const res = await fetch(`${API_BASE}/admin/exercises/${exerciseId}/images`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Gambar diunggah.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Gagal mengunggah gambar.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function deleteAdminExerciseImage(
+  exerciseId: number,
+  imageId: number
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/admin/exercises/${exerciseId}/images/${imageId}`,
+      {
+        method: 'DELETE',
+        headers: authHeaders(),
+      }
+    );
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Gambar dihapus.',
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Gagal menghapus gambar.';
+    return { success: false, message: msg };
+  }
+}
+
+export async function getAdminSplits(): Promise<Split[]> {
+  try {
+    const res = await fetch(`${API_BASE}/admin/splits`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function updateAdminSplit(
+  id: number,
+  payload: Partial<Split>
+): Promise<{ success: boolean; message: string; data?: Split }> {
+  try {
+    const res = await fetch(`${API_BASE}/admin/splits/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    return {
+      success: res.ok,
+      message: json.message || 'Split diperbarui.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Gagal memperbarui split.';
+    return { success: false, message: msg };
   }
 }

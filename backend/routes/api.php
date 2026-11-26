@@ -1,15 +1,18 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\WorkoutController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\TrainerController;
+use App\Http\Controllers\AdminExerciseController;
+use App\Http\Controllers\AdminSplitController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\CoachingRequestController;
 use App\Http\Controllers\DailySessionController;
 use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\ExerciseController;
 use App\Http\Controllers\SplitController;
+use App\Http\Controllers\TrainerController;
 use App\Http\Controllers\UserPlanController;
 
 /*
@@ -47,6 +50,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Client-specific actions
     Route::post('/client/select-trainer', [ClientController::class, 'selectTrainer']);
     Route::get('/client/my-progress', [ClientController::class, 'myProgress']);
+    Route::get('/client/coaching-requests', [CoachingRequestController::class, 'clientIndex']);
+    Route::post('/client/coaching-requests', [CoachingRequestController::class, 'store']);
 
     // User Plan & Weekly Schedule Builder
     Route::get('/user/plan', [UserPlanController::class, 'show']);
@@ -65,6 +70,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/clients', [TrainerController::class, 'addClient']);
         Route::delete('/clients/{clientId}', [TrainerController::class, 'removeClient']);
         Route::get('/clients/{clientId}/progress', [TrainerController::class, 'clientProgress']);
+        Route::get('/clients/{clientId}/today', [TrainerController::class, 'clientToday']);
+        Route::patch('/clients/{clientId}/daily-sessions/{date}', [TrainerController::class, 'overrideDailySession']);
+        Route::get('/coaching-requests', [CoachingRequestController::class, 'trainerIndex']);
+        Route::patch('/coaching-requests/{id}', [CoachingRequestController::class, 'respond'])->whereNumber('id');
     });
 
     // --- 5. Admin Routes (Admin Only) ---
@@ -73,6 +82,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/users', [AdminController::class, 'users']);
         Route::patch('/users/{id}', [AdminController::class, 'updateUser']);
         Route::delete('/users/{id}', [AdminController::class, 'deleteUser']);
-        Route::post('/exercises', [WorkoutController::class, 'storeExercise']);
+        Route::get('/exercises', [AdminExerciseController::class, 'index']);
+        Route::post('/exercises', [AdminExerciseController::class, 'store']);
+        Route::patch('/exercises/{id}', [AdminExerciseController::class, 'update'])->whereNumber('id');
+        Route::post('/exercises/{id}/images', [AdminExerciseController::class, 'uploadImage'])->whereNumber('id');
+        Route::delete('/exercises/{id}/images/{imageId}', [AdminExerciseController::class, 'deleteImage'])->whereNumber(['id', 'imageId']);
+        Route::get('/splits', [AdminSplitController::class, 'index']);
+        Route::patch('/splits/{id}', [AdminSplitController::class, 'update'])->whereNumber('id');
     });
 });

@@ -10,10 +10,16 @@ import {
   Users,
   ArrowLeft,
   X,
+  Clock,
+  Send,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getTrainers } from "@/lib/api";
-import { User } from "@/types/workout";
+import {
+  createCoachingRequest,
+  getClientCoachingRequests,
+  getTrainers,
+} from "@/lib/api";
+import { CoachingRequest, User } from "@/types/workout";
 
 function getInitials(name: string) {
   return name
@@ -27,31 +33,69 @@ function getInitials(name: string) {
 export default function SelectTrainerPage() {
   const { user, chooseTrainer } = useAuth();
   const [trainers, setTrainers] = useState<User[]>([]);
+  const [requests, setRequests] = useState<CoachingRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [isUpdating, setIsUpdating] = useState<number | null>(null);
+  const [requestMessages, setRequestMessages] = useState<Record<number, string>>(
+    {}
+  );
 
   useEffect(() => {
-    getTrainers().then((data) => {
-      setTrainers(data);
-      setIsLoading(false);
-    });
+    let active = true;
+    Promise.all([getTrainers(), getClientCoachingRequests()]).then(
+      ([tData, rData]) => {
+        if (!active) return;
+        setTrainers(tData);
+        setRequests(rData);
+        setIsLoading(false);
+      }
+    );
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const handleSelect = async (trainerId: number | null) => {
-    setIsUpdating(trainerId ?? -1);
-    const res = await chooseTrainer(trainerId);
+  const handleUnassign = async () => {
+    setIsUpdating(-1);
+    const res = await chooseTrainer(null);
     setIsUpdating(null);
     if (res.success) {
-      setActionMsg(res.message);
+      setActionMsg({ type: "success", text: res.message });
       setTimeout(() => setActionMsg(null), 4000);
     }
   };
 
+  const handleSendRequest = async (trainerId: number) => {
+    setIsUpdating(trainerId);
+    const res = await createCoachingRequest(
+      trainerId,
+      requestMessages[trainerId]
+    );
+    setIsUpdating(null);
+
+    setActionMsg({
+      type: res.success ? "success" : "error",
+      text: res.message,
+    });
+    setTimeout(() => setActionMsg(null), 4000);
+
+    if (res.success) {
+      const updated = await getClientCoachingRequests();
+      setRequests(updated);
+    }
+  };
+
+  const pendingTrainerIds = new Set(
+    requests.filter((r) => r.status === "pending").map((r) => r.trainer_id)
+  );
+
   return (
     <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Navigation Breadcrumb */}
         <div className="mb-5">
           <Link
             href="/"
@@ -62,14 +106,13 @@ export default function SelectTrainerPage() {
           </Link>
         </div>
 
-        {/* Header */}
         <div className="mb-8 pb-6 border-b border-[#DCE1D8]">
           <h1 className="text-2xl sm:text-3xl font-bold text-[#141916] tracking-tight flex items-center gap-2.5">
             <Award className="w-7 h-7 text-[#C84B11]" />
             <span>Pilih Personal Trainer Pendamping</span>
           </h1>
           <p className="text-sm text-[#48524C] mt-1.5 max-w-2xl">
-            Tingkatkan konsistensi latihan Anda dengan bimbingan pelatih profesional yang memantau progres beban, repetisi, dan RIR Anda.
+            Ajukan permintaan bimbingan kepada pelatih pilihan Anda. Setelah pelatih menerima permintaan, ia dapat memantau progres dan menyesuaikan status latihan harian Anda.
           </p>
         </div>
 
@@ -77,10 +120,14 @@ export default function SelectTrainerPage() {
           <div
             role="status"
             aria-live="polite"
-            className="mb-6 p-4 bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl text-[#047857] text-sm flex items-center gap-2.5 shadow-xs"
+            className={`mb-6 p-4 rounded-xl text-sm flex items-center gap-2.5 shadow-xs border ${
+              actionMsg.type === "success"
+                ? "bg-[#ECFDF5] border-[#A7F3D0] text-[#047857]"
+                : "bg-[#FFF1F2] border-[#FECDD3] text-[#BE123C]"
+            }`}
           >
             <CheckCircle2 className="w-5 h-5 shrink-0" />
-            <span className="font-semibold">{actionMsg}</span>
+            <span className="font-semibold">{actionMsg.text}</span>
           </div>
         )}
 
@@ -114,7 +161,7 @@ export default function SelectTrainerPage() {
                     Belum Memilih Personal Trainer
                   </h2>
                   <p className="text-sm text-[#48524C] mt-0.5">
-                    Anda saat ini berlatih secara mandiri. Pilih salah satu pelatih di bawah untuk evaluasi progres berkala.
+                    Anda saat ini berlatih secara mandiri. Kirim permintaan bimbingan ke salah satu pelatih di bawah ini.
                   </p>
                 </div>
               )}
@@ -123,7 +170,7 @@ export default function SelectTrainerPage() {
             {user?.trainer && (
               <button
                 type="button"
-                onClick={() => handleSelect(null)}
+                onClick={handleUnassign}
                 disabled={isUpdating !== null}
                 className="h-10 px-4 bg-[#ECEFE9] hover:bg-[#FFF1F2] hover:text-[#BE123C] border border-[#DCE1D8] hover:border-[#FECDD3] text-[#48524C] rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
               >
@@ -151,14 +198,8 @@ export default function SelectTrainerPage() {
                   key={item}
                   className="p-6 bg-white border border-[#DCE1D8] rounded-2xl animate-pulse space-y-4"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-[#ECEFE9]" />
-                    <div className="space-y-2 flex-1">
-                      <div className="h-4 w-36 bg-[#ECEFE9] rounded" />
-                      <div className="h-3 w-24 bg-[#ECEFE9] rounded" />
-                    </div>
-                  </div>
-                  <div className="h-14 bg-[#ECEFE9] rounded-xl" />
+                  <div className="h-12 bg-[#ECEFE9] rounded-xl" />
+                  <div className="h-16 bg-[#ECEFE9] rounded-xl" />
                   <div className="h-10 bg-[#ECEFE9] rounded-xl" />
                 </div>
               ))}
@@ -171,6 +212,7 @@ export default function SelectTrainerPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {trainers.map((trainer) => {
                 const isCurrent = user?.trainer_id === trainer.id;
+                const isPending = pendingTrainerIds.has(trainer.id);
 
                 return (
                   <div
@@ -205,7 +247,7 @@ export default function SelectTrainerPage() {
 
                         {isCurrent && (
                           <span className="px-2.5 py-1 rounded-lg bg-[#1D4ED8] text-white font-semibold text-xs shrink-0">
-                            Dipilih
+                            Aktif
                           </span>
                         )}
                       </div>
@@ -220,7 +262,7 @@ export default function SelectTrainerPage() {
                         </p>
                       </div>
 
-                      <div className="text-sm text-[#48524C] space-y-2 mb-6">
+                      <div className="text-sm text-[#48524C] space-y-2 mb-5">
                         <div className="flex items-center gap-2.5">
                           <Mail className="w-4 h-4 text-[#626E67] shrink-0" />
                           <span className="truncate">{trainer.email}</span>
@@ -234,25 +276,46 @@ export default function SelectTrainerPage() {
                       </div>
                     </div>
 
-                    <div>
+                    <div className="space-y-2.5">
                       {isCurrent ? (
                         <div className="w-full h-11 bg-[#ECFDF5] border border-[#A7F3D0] text-[#047857] font-semibold rounded-xl text-sm flex items-center justify-center gap-2">
                           <CheckCircle2 className="w-4 h-4" />
                           <span>Trainer Anda Saat Ini</span>
                         </div>
+                      ) : isPending ? (
+                        <div className="w-full h-11 bg-[#FFFBEB] border border-[#FDE68A] text-[#B45309] font-semibold rounded-xl text-sm flex items-center justify-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          <span>Menunggu Persetujuan Trainer</span>
+                        </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleSelect(trainer.id)}
-                          disabled={isUpdating === trainer.id}
-                          className="w-full h-11 bg-[#C84B11] hover:bg-[#A83D0B] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors cursor-pointer"
-                        >
-                          {isUpdating === trainer.id
-                            ? "Memproses..."
-                            : user?.trainer
-                            ? "Ganti ke Trainer Ini"
-                            : "Pilih Sebagai Trainer Saya"}
-                        </button>
+                        <>
+                          <input
+                            type="text"
+                            aria-label={`Pesan singkat untuk ${trainer.name}`}
+                            placeholder="Pesan opsional (misal: Ingin fokus hipertrofi 4x/minggu)"
+                            value={requestMessages[trainer.id] || ""}
+                            onChange={(e) =>
+                              setRequestMessages((prev) => ({
+                                ...prev,
+                                [trainer.id]: e.target.value,
+                              }))
+                            }
+                            className="w-full h-10 px-3 bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl text-xs text-[#141916] placeholder:text-[#626E67] outline-none focus:bg-white focus:border-[#C84B11]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSendRequest(trainer.id)}
+                            disabled={isUpdating === trainer.id}
+                            className="w-full h-11 bg-[#C84B11] hover:bg-[#A83D0B] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <Send className="w-4 h-4" />
+                            <span>
+                              {isUpdating === trainer.id
+                                ? "Mengirim Permintaan..."
+                                : "Ajukan Bimbingan"}
+                            </span>
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

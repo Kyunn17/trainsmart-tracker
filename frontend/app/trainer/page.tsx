@@ -13,6 +13,9 @@ import {
   Mail,
   Phone,
   StickyNote,
+  CalendarClock,
+  Check,
+  Inbox,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -20,13 +23,26 @@ import {
   addTrainerClient,
   removeTrainerClient,
   getClientProgress,
+  getTrainerCoachingRequests,
+  respondCoachingRequest,
+  getTrainerClientToday,
+  overrideTrainerClientDailySession,
 } from "@/lib/api";
-import { User, ClientProgressResponse, WorkoutLogEntry } from "@/types/workout";
+import {
+  User,
+  ClientProgressResponse,
+  WorkoutLogEntry,
+  CoachingRequest,
+  TrainerClientTodayResponse,
+  DailySessionStatus,
+} from "@/types/workout";
 
 export default function TrainerDashboard() {
   const { user } = useAuth();
   const [clients, setClients] = useState<User[]>([]);
+  const [requests, setRequests] = useState<CoachingRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [respondingId, setRespondingId] = useState<number | null>(null);
 
   const [newClientEmail, setNewClientEmail] = useState("");
   const [addMsg, setAddMsg] = useState<{
@@ -35,24 +51,48 @@ export default function TrainerDashboard() {
   } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
+  // Client Progress Modal
   const [selectedClientProgress, setSelectedClientProgress] =
     useState<ClientProgressResponse | null>(null);
   const [isLoadingProgress, setIsLoadingProgress] = useState(false);
 
-  const loadClients = async () => {
+  // Client Today Schedule & Override Modal
+  const [todayModal, setTodayModal] =
+    useState<TrainerClientTodayResponse | null>(null);
+  const [isLoadingToday, setIsLoadingToday] = useState(false);
+  const [overrideStatus, setOverrideStatus] =
+    useState<DailySessionStatus>("rest");
+  const [overrideNote, setOverrideNote] = useState("");
+  const [overrideDate, setOverrideDate] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+  const [overrideMsg, setOverrideMsg] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [isSavingOverride, setIsSavingOverride] = useState(false);
+
+  const refreshAll = async () => {
     setIsLoading(true);
-    const data = await getTrainerClients();
-    setClients(data);
+    const [cData, rData] = await Promise.all([
+      getTrainerClients(),
+      getTrainerCoachingRequests(),
+    ]);
+    setClients(cData);
+    setRequests(rData);
     setIsLoading(false);
   };
 
   useEffect(() => {
     let active = true;
-    getTrainerClients().then((data) => {
-      if (!active) return;
-      setClients(data);
-      setIsLoading(false);
-    });
+    Promise.all([getTrainerClients(), getTrainerCoachingRequests()]).then(
+      ([cData, rData]) => {
+        if (!active) return;
+        setClients(cData);
+        setRequests(rData);
+        setIsLoading(false);
+      }
+    );
     return () => {
       active = false;
     };
@@ -60,14 +100,31 @@ export default function TrainerDashboard() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && (selectedClientProgress || isLoadingProgress)) {
+      if (e.key !== "Escape") return;
+      if (selectedClientProgress || isLoadingProgress) {
         setSelectedClientProgress(null);
         setIsLoadingProgress(false);
+      }
+      if (todayModal || isLoadingToday) {
+        setTodayModal(null);
+        setIsLoadingToday(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedClientProgress, isLoadingProgress]);
+  }, [selectedClientProgress, isLoadingProgress, todayModal, isLoadingToday]);
+
+  const handleRespondRequest = async (
+    requestId: number,
+    decision: "accepted" | "rejected"
+  ) => {
+    setRespondingId(requestId);
+    const res = await respondCoachingRequest(requestId, decision);
+    setRespondingId(null);
+    if (res.success) {
+      await refreshAll();
+    }
+  };
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +138,7 @@ export default function TrainerDashboard() {
     if (res.success) {
       setAddMsg({ type: "success", text: res.message });
       setNewClientEmail("");
-      loadClients();
+      refreshAll();
     } else {
       setAddMsg({ type: "error", text: res.message });
     }
@@ -91,7 +148,7 @@ export default function TrainerDashboard() {
     if (!confirm(`Lepas ${clientName} dari daftar bimbingan Anda?`)) return;
     const res = await removeTrainerClient(clientId);
     if (res.success) {
-      loadClients();
+      refreshAll();
     }
   };
 
@@ -102,31 +159,143 @@ export default function TrainerDashboard() {
     setIsLoadingProgress(false);
   };
 
+  const handleOpenTodayModal = async (clientId: number) => {
+    setIsLoadingToday(true);
+    setOverrideMsg(null);
+    const res = await getTrainerClientToday(clientId);
+    setTodayModal(res);
+    if (res?.data) {
+      setOverrideStatus(res.data.status);
+      setOverrideNote(res.data.trainer_note || "");
+      setOverrideDate(res.data.session_date);
+    } else {
+      setOverrideStatus("rest");
+      setOverrideNote("");
+      setOverrideDate(new Date().toISOString().slice(0, 10));
+    }
+    setIsLoadingToday(false);
+  };
+
+  const handleSaveOverride = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!todayModal) return;
+    setOverrideMsg(null);
+    setIsSavingOverride(true);
+
+    const res = await overrideTrainerClientDailySession(
+      todayModal.client.id,
+      overrideDate,
+      overrideStatus,
+      overrideNote
+    );
+
+    setIsSavingOverride(false);
+
+    if (!res.success) {
+      setOverrideMsg({ type: "error", text: res.message });
+      return;
+    }
+
+    setOverrideMsg({ type: "success", text: res.message });
+    const refreshed = await getTrainerClientToday(todayModal.client.id);
+    if (refreshed) setTodayModal(refreshed);
+  };
+
+  const pendingRequests = requests.filter((r) => r.status === "pending");
+
   return (
     <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between pb-6 mb-8 border-b border-[#DCE1D8] gap-4">
+        <div className="flex flex-col md:flex-row md:items-end justify-between pb-6 border-b border-[#DCE1D8] gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#141916] tracking-tight flex items-center gap-2.5">
               <Users className="w-7 h-7 text-[#1D4ED8]" />
               <span>Klien Bimbingan {user?.name || "Personal Trainer"}</span>
             </h1>
             <p className="text-sm text-[#48524C] mt-1.5">
-              Pantau progres latihan, beban angkatan, dan konsistensi RIR setiap klien Anda.
+              Kelola permintaan bimbingan masuk, pantau progres, dan sesuaikan status latihan harian klien.
             </p>
           </div>
 
-          <span className="px-3.5 py-2 bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D4ED8] text-xs font-mono tabular-nums font-semibold rounded-xl self-start md:self-auto">
-            {clients.length} Klien Aktif
-          </span>
+          <div className="flex items-center gap-2 self-start md:self-auto">
+            {pendingRequests.length > 0 && (
+              <span className="px-3.5 py-2 bg-[#FFFBEB] border border-[#FDE68A] text-[#B45309] text-xs font-mono tabular-nums font-semibold rounded-xl">
+                {pendingRequests.length} Permintaan Baru
+              </span>
+            )}
+            <span className="px-3.5 py-2 bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D4ED8] text-xs font-mono tabular-nums font-semibold rounded-xl">
+              {clients.length} Klien Aktif
+            </span>
+          </div>
         </div>
 
+        {/* Incoming Coaching Requests */}
+        {pendingRequests.length > 0 && (
+          <section
+            aria-labelledby="incoming-requests-heading"
+            className="p-6 bg-white border border-[#FDE68A] rounded-2xl shadow-xs space-y-4"
+          >
+            <h2
+              id="incoming-requests-heading"
+              className="text-base font-bold text-[#141916] flex items-center gap-2"
+            >
+              <Inbox className="w-5 h-5 text-[#B45309]" />
+              <span>Permintaan Bimbingan Masuk ({pendingRequests.length})</span>
+            </h2>
+
+            <div className="space-y-3">
+              {pendingRequests.map((req) => (
+                <div
+                  key={req.id}
+                  className="p-4 bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div>
+                    <p className="font-bold text-sm text-[#141916]">
+                      {req.client?.name || `Klien #${req.client_id}`}
+                    </p>
+                    <p className="text-xs text-[#626E67]">
+                      {req.client?.email}
+                      {req.client?.phone ? ` • ${req.client.phone}` : ""}
+                    </p>
+                    {req.message && (
+                      <p className="text-xs text-[#48524C] mt-1.5 bg-white border border-[#DCE1D8] px-3 py-1.5 rounded-lg inline-block">
+                        &ldquo;{req.message}&rdquo;
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleRespondRequest(req.id, "accepted")}
+                      disabled={respondingId === req.id}
+                      className="h-10 px-4 bg-[#047857] hover:bg-[#065F46] disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Terima</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRespondRequest(req.id, "rejected")}
+                      disabled={respondingId === req.id}
+                      className="h-10 px-4 bg-white hover:bg-[#FFF1F2] text-[#BE123C] border border-[#FECDD3] disabled:opacity-50 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>Tolak</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Add Client Form Card */}
-        <div className="mb-8 p-6 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
+        <div className="p-6 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
           <h2 className="text-base font-bold text-[#141916] mb-1 flex items-center gap-2">
             <UserPlus className="w-4 h-4 text-[#1D4ED8]" />
-            <span>Tambah Klien Baru ke Roster</span>
+            <span>Tambah Klien Langsung ke Roster</span>
           </h2>
           <p className="text-sm text-[#48524C] mb-4">
             Masukkan alamat email member yang sudah terdaftar di TrainSmart untuk menghubungkan akun mereka.
@@ -192,7 +361,6 @@ export default function TrainerDashboard() {
                   className="p-5 bg-white border border-[#DCE1D8] rounded-2xl animate-pulse space-y-4"
                 >
                   <div className="h-5 w-40 bg-[#ECEFE9] rounded" />
-                  <div className="h-4 w-52 bg-[#ECEFE9] rounded" />
                   <div className="h-16 bg-[#ECEFE9] rounded-xl" />
                   <div className="h-10 bg-[#ECEFE9] rounded-xl" />
                 </div>
@@ -207,7 +375,7 @@ export default function TrainerDashboard() {
                 Belum Ada Klien Terdaftar
               </h3>
               <p className="text-sm text-[#48524C] max-w-md mx-auto">
-                Tambahkan klien pertama Anda menggunakan formulir di atas, atau minta klien memilih Anda dari halaman akun mereka.
+                Tambahkan klien melalui email di atas atau terima permintaan bimbingan dari member.
               </p>
             </div>
           ) : (
@@ -268,14 +436,23 @@ export default function TrainerDashboard() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 pt-3 border-t border-[#DCE1D8]">
+                    <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-[#DCE1D8]">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenTodayModal(client.id)}
+                        className="flex-1 h-10 px-3 bg-[#FFF1EA] hover:bg-[#F4C4AC]/50 border border-[#F4C4AC] text-[#C84B11] rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <CalendarClock className="w-4 h-4" />
+                        <span>Jadwal Hari Ini</span>
+                      </button>
+
                       <button
                         type="button"
                         onClick={() => handleViewProgress(client.id)}
-                        className="flex-1 h-10 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        className="flex-1 h-10 px-3 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <TrendingUp className="w-4 h-4" />
-                        <span>Lihat Analisis Progres</span>
+                        <span>Progres</span>
                       </button>
 
                       <button
@@ -297,7 +474,137 @@ export default function TrainerDashboard() {
           )}
         </section>
 
-        {/* Client Progress Modal (loading or loaded) */}
+        {/* Client Today Schedule & Trainer Override Modal */}
+        {(isLoadingToday || todayModal) && (
+          <div
+            className="fixed inset-0 bg-[#141916]/65 z-50 flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="trainer-today-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setTodayModal(null);
+                setIsLoadingToday(false);
+              }
+            }}
+          >
+            <div className="bg-white border border-[#DCE1D8] p-6 sm:p-7 rounded-2xl max-w-lg w-full shadow-xl relative space-y-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setTodayModal(null);
+                  setIsLoadingToday(false);
+                }}
+                className="absolute top-4 right-4 h-9 w-9 text-[#48524C] hover:text-[#141916] rounded-xl bg-[#ECEFE9] hover:bg-[#DCE1D8] flex items-center justify-center cursor-pointer"
+                aria-label="Tutup modal jadwal hari ini"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {isLoadingToday ? (
+                <div className="space-y-3 py-6 animate-pulse">
+                  <div className="h-6 w-48 bg-[#ECEFE9] rounded" />
+                  <div className="h-24 bg-[#ECEFE9] rounded-xl" />
+                </div>
+              ) : (
+                todayModal && (
+                  <>
+                    <div className="pr-8">
+                      <h3
+                        id="trainer-today-modal-title"
+                        className="text-xl font-bold text-[#141916]"
+                      >
+                        Jadwal Hari Ini: {todayModal.client.name}
+                      </h3>
+                      <p className="text-sm text-[#48524C] mt-1">
+                        {todayModal.has_plan
+                          ? `Program: ${todayModal.split_name || "-"} • Sesi: ${
+                              todayModal.data?.split_session?.name ||
+                              "Hari Istirahat"
+                            }`
+                          : "Klien belum menyusun jadwal latihan mingguan."}
+                      </p>
+                    </div>
+
+                    {overrideMsg && (
+                      <div
+                        role="status"
+                        className={`p-3 rounded-xl text-xs font-medium border ${
+                          overrideMsg.type === "success"
+                            ? "bg-[#ECFDF5] border-[#A7F3D0] text-[#047857]"
+                            : "bg-[#FFF1F2] border-[#FECDD3] text-[#BE123C]"
+                        }`}
+                      >
+                        {overrideMsg.text}
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSaveOverride} className="space-y-4">
+                      <div>
+                        <label
+                          htmlFor="override-status"
+                          className="block text-sm font-semibold text-[#141916] mb-1.5"
+                        >
+                          Ubah Status Hari Ini
+                        </label>
+                        <select
+                          id="override-status"
+                          value={overrideStatus}
+                          onChange={(e) =>
+                            setOverrideStatus(
+                              e.target.value as DailySessionStatus
+                            )
+                          }
+                          className="w-full h-11 px-3 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] outline-none focus:border-[#1D4ED8]"
+                        >
+                          <option value="rest">Istirahat (Rest)</option>
+                          <option value="skipped">Lewati (Skipped)</option>
+                          <option value="pending">
+                            Belum Selesai (Pending)
+                          </option>
+                          <option value="done">Selesai (Done)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="override-note"
+                          className="block text-sm font-semibold text-[#141916] mb-1.5"
+                        >
+                          Catatan Alasan untuk Klien (Wajib)
+                        </label>
+                        <textarea
+                          id="override-note"
+                          rows={3}
+                          placeholder="Contoh: Istirahat hari ini untuk pemulihan bahu, lanjut besok dengan beban ringan."
+                          value={overrideNote}
+                          onChange={(e) => setOverrideNote(e.target.value)}
+                          className="w-full p-3 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#1D4ED8]"
+                          required
+                        />
+                        <p className="text-xs text-[#626E67] mt-1">
+                          Status yang diubah Trainer akan mengunci status klien pada tanggal ini dan menampilkan catatan Anda di dashboard mereka.
+                        </p>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isSavingOverride}
+                        className="w-full h-11 bg-[#1D4ED8] hover:bg-[#1E40AF] disabled:opacity-50 text-white font-semibold rounded-xl text-sm cursor-pointer"
+                      >
+                        {isSavingOverride
+                          ? "Menyimpan Perubahan..."
+                          : "Simpan Status & Catatan Trainer"}
+                      </button>
+                    </form>
+                  </>
+                )
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Client Progress Modal */}
         {(isLoadingProgress || selectedClientProgress) && (
           <div
             className="fixed inset-0 bg-[#141916]/65 z-50 flex items-center justify-center p-4"
@@ -349,7 +656,6 @@ export default function TrainerDashboard() {
                       </p>
                     </div>
 
-                    {/* Summary KPIs */}
                     <div className="grid grid-cols-3 gap-3 mb-6">
                       <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] text-center">
                         <span className="text-xs text-[#626E67] block mb-1">
@@ -378,7 +684,6 @@ export default function TrainerDashboard() {
                       </div>
                     </div>
 
-                    {/* Set-by-set Log List */}
                     <div>
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-[#626E67] mb-3">
                         Riwayat Eksekusi Set & Catatan Form

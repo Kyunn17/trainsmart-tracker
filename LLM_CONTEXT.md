@@ -1,203 +1,125 @@
 # LLM Context: TrainSmart Monorepo
 
-> **Purpose:** This document is designed as a complete, comprehensive context primer for Large Language Models (ChatGPT, Claude, Gemini, etc.) to understand the architecture, domain logic, design system, data contracts, and workflows of the **TrainSmart** application.
+> **Purpose:** Complete context primer for Large Language Models (ChatGPT, Claude, Gemini, etc.) covering the architecture, domain logic, database schema, API endpoints, frontend routes, and design system of the **TrainSmart** Workout Guide & Hypertrophy Tracker application.
 
 ---
 
 ## 1. Project Overview & Domain
 
-**TrainSmart** is a Hypertrophy & Gym Workout Tracker designed around evidence-based bodybuilding and strength training principles. It provides a structured system to ensure **Progressive Overload** by tracking:
-- Target weight (KG) and repetitions
-- **RIR (Reps In Reserve)**: 
-  - `0`: Muscular failure
-  - `1–2`: Hypertrophic sweet-spot (Near-failure with form preservation)
-  - `3+`: Sub-maximal / warm-up sets
-- Rest timers (default 2 minutes) for ATP/phosphocreatine recovery
-- Total tonnage/volume accumulation ($kg \times reps$)
-- 3-tier user role hierarchy: **Member/Client**, **Personal Trainer (PT)**, and **Administrator**
+**TrainSmart** is an Indonesian-language beginner-friendly **Dynamic Workout Guide & Hypertrophy Tracker**. It guides gym beginners from choosing how many days per week they can train through split recommendation, exercise learning (with local start/end demonstration photos), drag-and-drop weekly scheduling, daily workout execution, weekly rule-based evaluation, and Personal Trainer / Admin supervision.
+
+Core domain rules:
+- **Hypertrophy & Progressive Overload:** Tracks weight (KG), reps, **RIR (Reps In Reserve: `0` failure, `1–2` optimal hypertrophy, `3+` warm-up)**, tonnage ($kg \times reps$), and 120s rest periods.
+- **Role Hierarchy:** `client` (Member), `trainer` (Personal Trainer), and `admin` (Administrator).
+- **Language:** All user-facing UI copy, split descriptions/pros/cons, schedule warnings, and evaluation suggestions are in **Indonesian**. Exercise dataset names and raw instructions come from `free-exercise-db` (English standard gym names) paired with Indonesian coaching tips/mistakes.
 
 ---
 
 ## 2. Monorepo Architecture
 
-This project is configured as a Turborepo monorepo:
-
 ```text
 my-monorepo/
-├── frontend/             # Next.js 16 (App Router), React 19, Tailwind CSS v4, Lucide Icons
-├── backend/              # Laravel 11/12 REST API, Laravel Sanctum, SQLite/MySQL
+├── frontend/             # Next.js 16 (App Router), React 19, Tailwind CSS v4, @dnd-kit, Lucide
+├── backend/              # Laravel 13 REST API, Laravel Sanctum, MySQL / SQLite (tests)
 ├── docs/                 # Docusaurus documentation workspace
-├── package.json          # Root workspace configuration (Turborepo)
-├── turbo.json            # Turborepo task pipeline
-└── .agents/ & .agent/    # AI Agent skills, hooks, and impeccable skill configuration
+├── package.json          # Turborepo workspace configuration
+├── turbo.json            # Turborepo pipeline
+└── .agents/ & .agent/    # AI Agent skills & hooks (impeccable)
 ```
 
-### Monorepo Scripts (`npm run <script>`)
-- `dev`: `turbo run dev`
-- `build`: `turbo run build`
-- `lint`: `turbo run lint`
-- `dev:frontend`: `npm run dev --workspace=frontend` (Next.js on `http://localhost:3000`)
-- `dev:backend`: `php backend/artisan serve` (Laravel API on `http://127.0.0.1:8000`)
-- `dev:docs`: `npm run dev --workspace=docs`
+### Scripts
+- `npm run dev:frontend` — Next.js dev server (`http://localhost:3000`)
+- `npm run dev:backend` — Laravel API server (`http://127.0.0.1:8000`)
+- `npm run build:frontend` — Production Next.js build
+- `php backend/artisan migrate` / `php backend/artisan db:seed`
+- `php backend/artisan exercises:import` — Idempotent importer for `free-exercise-db` (240 exercises + 480 local images across 10 muscle groups)
+- `Push-Location backend; php artisan test; Pop-Location` — PHPUnit test suite
 
 ---
 
-## 3. Frontend Architecture (Next.js)
+## 3. Database Schema (Laravel Migrations)
 
-- **Framework:** Next.js 16 (App Router), React 19, TypeScript
-- **Styling:** Tailwind CSS v4 (`@import "tailwindcss";` in `app/globals.css`), inline `@theme` tokens
-- **Icons:** `lucide-react`
-- **Typography:** `Geist` (Sans) and `Geist_Mono` (tabular numerals for logs and timers)
-- **State Management:** React Context (`AuthContext.tsx`) + Local State / Server Components
-
-### Directory Structure (`frontend/app`)
-- `app/layout.tsx`: Root HTML shell, Geist fonts, `AuthProvider`, sticky `Navbar`.
-- `app/page.tsx`: Main dashboard with workout split cards (`Push`, `Pull`, `Legs`), hypertrophy metrics, and recent logs list.
-- `app/workout/[id]/page.tsx`: Dynamic category workout session page with split information.
-- `app/components/WorkoutPlanner.tsx`: Two-phase workout interface:
-  - **Phase 1 (Preparation):** Adjust target set count per exercise, edit technique cues (tempo, bench angle), add custom exercise variations, view session summary.
-  - **Phase 2 (Gym Execution Tracker):** Sequential set logging, weight/reps inputs, RIR selector, rest timer countdown with SVG progress ring (minimizable to sticky top bar), exercise quick-switch rail, live session duration timer, and workout summary save modal.
-- `app/components/Navbar.tsx`: Sticky navigation bar with role-based routing and a dedicated horizontal scrollable strip for mobile viewports.
-- `app/login/page.tsx`: Email/password authentication form.
-- `app/register/page.tsx`: Account creation with interactive role selection (`client` vs `trainer`), trainer selection dropdown, or trainer specialization input.
-- `app/client/progress/page.tsx`: Client-facing hypertrophy analytics: total sets, total tonnage, average RIR, active coach banner, and complete set log history.
-- `app/client/trainer/page.tsx`: Directory of available Personal Trainers with specialization details and 1-click trainer assignment/removal.
-- `app/trainer/page.tsx`: Trainer portal for client roster management, adding clients via email, and inspecting individual client progressive overload reports.
-- `app/admin/page.tsx`: System dashboard with platform KPIs (total users, trainers, clients, sets, tonnage) and user management table to reassign roles or assign trainers.
-
-### Frontend API Layer (`frontend/lib/api.ts`)
-- Configured against `NEXT_PUBLIC_API_URL` (default: `http://127.0.0.1:8000/api`).
-- Uses Bearer tokens persisted in `localStorage` under key `trainsmart_token`.
+### Core & Expanded Tables
+- **`users`**: `id`, `name`, `email`, `password`, `role` (`client|trainer|admin`), `trainer_id` (nullable FK → `users`), `phone`, `specialization`.
+- **`categories`**: `id`, `name` (legacy Push/Pull/Legs splits, preserved).
+- **`exercises`**: `id`, `category_id` (nullable FK), `name`, `slug` (unique), `primary_muscle` (`chest`, `back`, `shoulders`, `biceps`, `triceps`, `quads`, `hamstrings`, `glutes`, `calves`, `core`), `secondary_muscles` (json), `equipment`, `movement_pattern`, `difficulty` (`beginner|intermediate|advanced`), `is_beginner_friendly` (bool), `instructions` (json), `common_mistakes` (json), `tips` (json), `video_url`, `is_active` (bool), `source`.
+- **`exercise_images`**: `id`, `exercise_id` (FK), `path` (relative path in `storage/app/public`, e.g. `exercises/{slug}/0.jpg`), `position` (`0` = start, `1` = end), `alt_text`. Model appends `url`.
+- **`splits`**: `id`, `slug` (unique), `name`, `description`, `min_days`, `max_days`, `pros` (json), `cons` (json), `suitable_for`, `is_active`, `sort_order`.
+  - Seeded by `SplitSeeder`: `full-body` (2–3 days), `upper-lower` (4 days), `ppl-ul` (5 days), `ppl-ap` (5 days), `ppl-2x` (6 days).
+- **`split_sessions`**: `id`, `split_id` (FK), `slug`, `name`, `session_type`, `muscle_groups` (json), `default_day_of_week` (1–7), `sort_order`.
+- **`exercise_split_session`**: pivot linking `split_session_id` ↔ `exercise_id` with `is_default_recommended`, `default_sets`, `default_rep_range`, `sort_order`.
+- **`user_plans`**: `id`, `user_id` (FK), `split_id` (FK), `days_per_week`, `is_active`, `onboarding_completed_at`.
+- **`plan_schedules`**: `id`, `user_plan_id` (FK), `day_of_week` (`1`=Mon..`7`=Sun), `split_session_id` (nullable FK; `null` = Rest Day).
+- **`daily_sessions`**: `id`, `user_id` (FK), `user_plan_id` (nullable FK), `split_session_id` (nullable FK), `session_date` (date, unique per user), `status` (`pending|done|skipped|rest`), `trainer_note`, `changed_by` (FK → `users`), `changed_by_role`, `completed_at`.
+- **`coaching_requests`**: `id`, `client_id` (FK), `trainer_id` (FK), `status` (`pending|accepted|rejected`), `message`, `responded_at`.
+- **`workout_logs`**: `id`, `user_id`, `exercise_id`, `daily_session_id` (nullable FK → `daily_sessions`), `set_number`, `weight`, `reps`, `rir`, `rpe`, `notes`, `created_at`.
 
 ---
 
-## 4. Design System ("Athletic Chalk & Slate" - Impeccable Skill)
+## 4. Complete API Route Reference (`backend/routes/api.php`)
 
-The UI adheres strictly to **Operate-mode** design principles (optimized for bright gym environments and mobile scanning):
-- **Canvas / Background:** `#F5F6F3` (`--bg-canvas`) — low-glare daylight contrast
-- **Surface / Cards:** `#FFFFFF` (`--bg-surface`) with structural `#DCE1D8` borders
-- **Secondary Surfaces:** `#ECEFE9` (`--bg-subtle`) for stat strips and table headers
-- **Text:** `#141916` (Primary, high-contrast), `#48524C` (Secondary), `#626E67` (Metadata)
-- **Semantic Colors:**
-  - **Push / Primary Accent:** Terracotta `#C84B11` (`#FFF1EA` soft bg, `#F4C4AC` border)
-  - **Pull / Trainers / Information:** Deep Cobalt `#1D4ED8` (`#EFF6FF` soft bg, `#BFDBFE` border)
-  - **Legs / Completed / Success:** Deep Pine Emerald `#047857` (`#ECFDF5` soft bg, `#A7F3D0` border)
-  - **Admin / Failure / Destructive:** Deep Crimson `#BE123C` (`#FFF1F2` soft bg, `#FECDD3` border)
-- **Touch Targets:** Minimum `44px` (`h-11`) for numeric inputs, buttons, and steppers.
-- **Rules Enforced:** Tabular numbers (`tabular-nums`) for all weights, sets, timers, and volumes; zero raw emojis in UI chrome (replaced with Lucide icons); zero ambient decorative glow/blur blobs; accessible focus rings (`:focus-visible`).
+### Public Endpoints
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/register` | Register user (`client` or `trainer`), returns Sanctum token |
+| `POST` | `/api/login` | Login and issue Sanctum token |
+| `GET` | `/api/categories` / `/api/menu-latihan` | Legacy split categories with exercises |
+| `GET` | `/api/categories/{id}` | Single legacy category |
+| `GET` | `/api/splits/recommendations?days={2..6}` | Split recommendations (FormRequest validated `2..6`) |
+| `GET` | `/api/splits/{id}` | Split details + sessions + recommended exercises with images (`?all_exercises=1` for all) |
+| `GET` | `/api/exercises` | Paginated search/filter (`search`, `muscle`, `equipment`, `difficulty`, `beginner_only`, `session_type`, `per_page`) |
+| `GET` | `/api/exercises/{idOrSlug}` | Full exercise guide, images, and mapped split sessions |
+| `GET` | `/api/trainers` | Public directory of registered Personal Trainers |
+| `GET` | `/api/workout-logs` | Recent workout history |
+| `POST` | `/api/workout-logs` | Batch save set logs (accepts optional `daily_session_id` to mark session `done`) |
 
----
-
-## 5. Backend Architecture (Laravel REST API)
-
-- **Framework:** Laravel 11/12
-- **Authentication:** Laravel Sanctum (Bearer Token)
-- **Authorization:** `CheckRole` Middleware (`role:admin`, `role:trainer,admin`)
-- **Database Tables / Models:**
-  - `users`: `id`, `name`, `email`, `password`, `role` (`client` | `trainer` | `admin`), `phone`, `specialization`, `trainer_id` (foreign key self-reference to `users.id`)
-  - `categories`: `id`, `name` (`Push`, `Pull`, `Legs`, etc.)
-  - `exercises`: `id`, `category_id`, `name`
-  - `workout_logs`: `id`, `user_id`, `exercise_id`, `set_number`, `weight`, `reps`, `rir`, `rpe`, `notes`, `created_at`
-
-### Complete API Route Reference (`backend/routes/api.php`)
-
-| Method | Endpoint | Auth | Role | Description |
-|---|---|---|---|---|
-| `POST` | `/api/register` | Public | None | Register new user as `client` or `trainer` |
-| `POST` | `/api/login` | Public | None | Authenticate and issue Sanctum token |
-| `GET` | `/api/categories` | Public | None | Get all workout splits with exercise lists |
-| `GET` | `/api/categories/{id}` | Public | None | Get single workout split by ID |
-| `GET` | `/api/trainers` | Public | None | Get list of all registered Personal Trainers |
-| `GET` | `/api/workout-logs` | Public | None | Get recent workout history |
-| `POST` | `/api/workout-logs` | Optional | None | Batch save completed set logs |
-| `GET` | `/api/me` or `/api/user` | Required | Any | Get current authenticated user profile |
-| `POST` | `/api/logout` | Required | Any | Revoke active Sanctum token |
-| `POST` | `/api/client/select-trainer` | Required | Client | Assign or remove personal trainer |
-| `GET` | `/api/client/my-progress` | Required | Client | Analytics: total sets, tonnage, average RIR, logs |
-| `GET` | `/api/trainer/clients` | Required | Trainer, Admin | Get assigned client roster |
-| `POST` | `/api/trainer/clients` | Required | Trainer, Admin | Connect a client by email address |
-| `DELETE` | `/api/trainer/clients/{id}` | Required | Trainer, Admin | Disconnect a client from trainer roster |
-| `GET` | `/api/trainer/clients/{id}/progress`| Required | Trainer, Admin | Inspect detailed client workout logs & stats |
-| `GET` | `/api/admin/stats` | Required | Admin | Global counts (users, trainers, logs, tonnage) |
-| `GET` | `/api/admin/users` | Required | Admin | List users with optional `?role=` filter |
-| `PATCH` | `/api/admin/users/{id}` | Required | Admin | Update user role or assigned trainer |
-| `DELETE` | `/api/admin/users/{id}` | Required | Admin | Delete user account and cascade logs |
-| `POST` | `/api/admin/exercises` | Required | Admin | Create exercise under a category |
+### Authenticated Endpoints (`auth:sanctum`)
+| Method | Endpoint | Role | Description |
+|---|---|---|---|
+| `GET` | `/api/me` / `/api/user` | Any | Current user profile |
+| `POST` | `/api/logout` | Any | Revoke current token |
+| `GET` | `/api/user/plan` | Any | Active `UserPlan`, 7-day `schedules`, and advisory `warnings` |
+| `POST` | `/api/user/plan` | Any | Save active plan + 7-day schedule (returns `201` + advisory `warnings`) |
+| `POST` | `/api/user/plan/validate-schedule` | Any | Dry-run schedule advisory validation |
+| `GET` | `/api/daily-sessions/today` | Any | Materialize/fetch today's session + 7-day `week_overview` |
+| `GET` | `/api/daily-sessions/{id}` | Owner | Single daily session with exercises & images |
+| `PATCH` | `/api/daily-sessions/{id}/status` | Owner | Update status (`409` if overridden by trainer) |
+| `GET` | `/api/evaluation/weekly?period=last_week\|current_week` | Any | Weekly adherence, tonnage delta, avg RIR, and 1–2 rule-based suggestions |
+| `POST` | `/api/client/select-trainer` | Client | Direct unassign/assign trainer |
+| `GET` | `/api/client/my-progress` | Client | Client personal progress summary & logs |
+| `GET` | `/api/client/coaching-requests` | Client | View sent coaching requests |
+| `POST` | `/api/client/coaching-requests` | Client | Send coaching request to a trainer |
+| `GET` | `/api/trainer/clients` | Trainer, Admin | Linked client roster |
+| `POST` | `/api/trainer/clients` | Trainer, Admin | Connect client by email |
+| `DELETE` | `/api/trainer/clients/{id}` | Trainer, Admin | Disconnect client |
+| `GET` | `/api/trainer/clients/{id}/progress` | Trainer, Admin | View linked client's progress |
+| `GET` | `/api/trainer/clients/{id}/today` | Trainer, Admin | View linked client's today schedule/status |
+| `PATCH` | `/api/trainer/clients/{id}/daily-sessions/{date}` | Trainer, Admin | Override client status (`rest|skipped|pending|done`) with required `trainer_note` |
+| `GET` | `/api/trainer/coaching-requests` | Trainer, Admin | View incoming coaching requests |
+| `PATCH` | `/api/trainer/coaching-requests/{id}` | Trainer, Admin | Accept or reject coaching request (`accepted` links `trainer_id`) |
+| `GET` | `/api/admin/stats` | Admin | Platform metrics |
+| `GET` / `PATCH` / `DELETE` | `/api/admin/users` | Admin | User/role/trainer management |
+| `GET` / `POST` / `PATCH` | `/api/admin/exercises` | Admin | Manage exercise catalog |
+| `POST` / `DELETE` | `/api/admin/exercises/{id}/images` | Admin | Upload (`jpg/jpeg/png/webp`, max 2MB, UUID filename) or delete images |
+| `GET` / `PATCH` | `/api/admin/splits` | Admin | Manage split metadata |
 
 ---
 
-## 6. TypeScript Data Contracts (`frontend/types/workout.ts`)
+## 5. Frontend Routes & Components (`frontend/app/`)
 
-```typescript
-export type UserRole = "admin" | "trainer" | "client";
-
-export interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: UserRole;
-  trainer_id?: number | null;
-  phone?: string | null;
-  specialization?: string | null;
-  trainer?: User | null;
-  clients?: User[];
-  clients_count?: number;
-  workout_logs_count?: number;
-}
-
-export interface SetData {
-  weight: string;
-  reps: string;
-  rir: number; // 0 = failure, 1-2 = optimal hypertrophy, 3+ = warm-up
-  rpe?: number;
-  notes?: string;
-  isCompleted: boolean;
-}
-
-export interface Exercise {
-  id: number;
-  category_id?: number;
-  name: string;
-  targetSets?: number;
-  setsData?: SetData[];
-  notes?: string;
-}
-
-export interface Category {
-  id: number;
-  name: string;
-  exercises: Exercise[];
-}
-
-export interface WorkoutLogEntry {
-  id?: number;
-  user_id?: number | null;
-  exercise_id: number;
-  exercise?: Exercise;
-  set_number: number;
-  weight: number | string;
-  reps: number | string;
-  rir?: number | null;
-  rpe?: number | null;
-  notes?: string | null;
-  created_at?: string;
-}
-```
+- `/` (`page.tsx` + `TodayDashboardSection.tsx`): Today's scheduled session card (Start Workout, Done, Skip, Trainer note, exercise preview with `"Cara"` modal, 7-day week strip) + legacy split cards & recent logs.
+- `/onboarding` (`onboarding/page.tsx` + `ScheduleBuilder.tsx`): 4-step wizard (`1. Hari Latihan` -> `2. Pilih Split` -> `3. Daftar Gerakan` -> `4. Atur Jadwal` with `@dnd-kit` drag-and-drop, `"Gunakan Rekomendasi"`, and live advisory warnings).
+- `/session/[id]` (`session/[id]/page.tsx`): Launches `WorkoutPlanner` for a specific `DailySession`, showing exercise thumbnails and `"Cara"` detail modal while logging sets.
+- `/workout/[id]` (`workout/[id]/page.tsx`): Preserved legacy category workout session using `WorkoutPlanner`.
+- `/exercises` (`exercises/page.tsx`): Searchable, filterable Exercise Library (`muscle`, `equipment`, `difficulty`, `beginner_only`) with `ExerciseThumbnail` (`next/image`) and `ExerciseDetailModal`.
+- `/credits` (`credits/page.tsx`): Attribution page for `yuhonas/free-exercise-db` (The Unlicense / Public Domain).
+- `/evaluation` (`evaluation/page.tsx`): Weekly evaluation dashboard (`Minggu Lalu` / `Minggu Ini`), 4 KPI cards, rule-based suggestions, and 7-day breakdown.
+- `/client/progress`, `/client/trainer`, `/trainer`, `/admin`, `/login`, `/register`.
 
 ---
 
-## 7. Guidelines for LLMs Modifying this Codebase
+## 6. Design System ("Athletic Chalk & Slate") & Guidelines
 
-1. **Preserve API Compatibility:** Keep endpoints, parameter names, and token-handling in sync between `frontend/lib/api.ts` and `backend/routes/api.php`.
-2. **Adhere to the Design System:** 
-   - Never reintroduce dark background classes (`bg-zinc-950`, `bg-zinc-900`) or raw emojis in UI buttons/cards.
-   - Use Lucide icons consistently.
-   - Maintain minimum `44px` touch targets for input controls.
-   - Use `tabular-nums` on all numeric data displays.
-3. **Hypertrophy Domain Truths:**
-   - Always treat RIR (Reps in Reserve) as the primary proximity-to-failure metric.
-   - Keep default rest periods at 120 seconds (2 minutes).
-   - Ensure sets are validated sequentially (Set 1 must be logged before Set 2).
-4. **Next.js & Monorepo Constraints:**
-   - Always run frontend commands from the root with `--workspace=frontend` or inside the `frontend/` directory.
-   - Respect client boundaries (`"use client"`) for pages containing interactive hooks (`useState`, `useEffect`, `useAuth`).
+- **Palette:** Canvas `#F5F6F3`, Surface `#FFFFFF`, Subtle `#ECEFE9`, Borders `#DCE1D8` / `#C5CCC0`, Text `#141916` / `#48524C` / `#626E67`, Primary Terracotta `#C84B11`, Cobalt `#1D4ED8`, Emerald `#047857`, Crimson `#BE123C`, Amber `#B45309`.
+- **Rules:** `tabular-nums` on all numbers, `44px` minimum touch targets (`h-11`), Lucide icons only (zero emojis in UI chrome), no decorative glow/blur blobs, no eyebrow labels above headings, `next/image` for exercise photos (`dangerouslyAllowLocalIP: process.env.NODE_ENV === "development"` in `next.config.ts`).
+- **Sync Rule:** Always keep `frontend/lib/api.ts`, `frontend/types/workout.ts`, and `backend/routes/api.php` synchronized.

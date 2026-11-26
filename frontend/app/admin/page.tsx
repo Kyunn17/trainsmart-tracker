@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   Award,
   ArrowLeft,
+  Dumbbell,
+  Layers,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -19,6 +21,7 @@ import {
   getTrainers,
 } from "@/lib/api";
 import { User, UserRole } from "@/types/workout";
+import AdminLibraryManager from "@/app/components/AdminLibraryManager";
 
 interface AdminStats {
   total_users: number;
@@ -35,6 +38,7 @@ export default function AdminPanelPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [allTrainers, setAllTrainers] = useState<User[]>([]);
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>("all");
+  const [activeAdminTab, setActiveAdminTab] = useState<"users" | "exercises" | "splits">("users");
   const [isLoading, setIsLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -221,7 +225,63 @@ export default function AdminPanelPage() {
           </div>
         )}
 
-        {/* User Management Section */}
+        {/* Section Switcher Tabs */}
+        <div
+          className="flex flex-wrap items-center gap-2 mb-6"
+          role="tablist"
+          aria-label="Bagian panel admin"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeAdminTab === "users"}
+            onClick={() => setActiveAdminTab("users")}
+            className={`h-11 px-4 rounded-xl border text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+              activeAdminTab === "users"
+                ? "bg-[#141916] text-white border-[#141916]"
+                : "bg-white text-[#48524C] border-[#DCE1D8] hover:text-[#141916]"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Pengguna</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeAdminTab === "exercises"}
+            onClick={() => setActiveAdminTab("exercises")}
+            className={`h-11 px-4 rounded-xl border text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+              activeAdminTab === "exercises"
+                ? "bg-[#141916] text-white border-[#141916]"
+                : "bg-white text-[#48524C] border-[#DCE1D8] hover:text-[#141916]"
+            }`}
+          >
+            <Dumbbell className="w-4 h-4" />
+            <span>Perpustakaan Gerakan</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeAdminTab === "splits"}
+            onClick={() => setActiveAdminTab("splits")}
+            className={`h-11 px-4 rounded-xl border text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
+              activeAdminTab === "splits"
+                ? "bg-[#141916] text-white border-[#141916]"
+                : "bg-white text-[#48524C] border-[#DCE1D8] hover:text-[#141916]"
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Program Split</span>
+          </button>
+        </div>
+
+        {activeAdminTab !== "users" ? (
+          <AdminLibraryManager
+            activeTab={activeAdminTab}
+            onNotify={showToast}
+          />
+        ) : (
+        /* User Management Section */
         <div className="bg-white border border-[#DCE1D8] rounded-2xl overflow-hidden shadow-xs">
           <div className="p-5 sm:p-6 bg-[#ECEFE9]/50 border-b border-[#DCE1D8] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -417,6 +477,7 @@ export default function AdminPanelPage() {
             </div>
           )}
         </div>
+        )}
       </div>
     </main>
   );

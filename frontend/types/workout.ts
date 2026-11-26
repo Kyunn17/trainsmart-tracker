@@ -255,3 +255,37 @@ export interface WeeklyEvaluationResponse {
   daily_breakdown: WeeklyEvaluationDay[];
   suggestions: WeeklyEvaluationSuggestion[];
 }
+
+export interface CoachingRequest {
+  id: number;
+  client_id: number;
+  trainer_id: number;
+  status: "pending" | "accepted" | "rejected";
+  message?: string | null;
+  responded_at?: string | null;
+  created_at?: string;
+  trainer?: Pick<User, "id" | "name" | "email" | "specialization">;
+  client?: Pick<User, "id" | "name" | "email" | "phone">;
+}
+
+export interface TrainerClientTodayResponse {
+  status: string;
+  has_plan: boolean;
+  client: Pick<User, "id" | "name" | "email">;
+  split_name?: string | null;
+  data: DailySession | null;
+}
+
+export interface AdminExercisePayload {
+  name: string;
+  primary_muscle?: string | null;
+  equipment?: string | null;
+  movement_pattern?: string | null;
+  difficulty?: "beginner" | "intermediate" | "advanced";
+  is_beginner_friendly?: boolean;
+  instructions?: string[];
+  common_mistakes?: string[];
+  tips?: string[];
+  is_active?: boolean;
+  split_session_ids?: number[];
+}
