@@ -130,6 +130,14 @@ export default function AppShell({ children }: AppShellProps) {
 
   // Guest / Auth Page Layout (minimal top header, no sidebar)
   if (!showSidebar) {
+    if (isAuthPage) {
+      return (
+        <div className="min-h-screen flex flex-col bg-[#F5F6F3] text-[#141916]">
+          {children}
+        </div>
+      );
+    }
+
     const isHome = pathname === "/";
     const headerClass = isHome
       ? isScrolled
