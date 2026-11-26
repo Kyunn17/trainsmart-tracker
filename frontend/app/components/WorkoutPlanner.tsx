@@ -22,12 +22,17 @@ import {
   Minimize2,
   Maximize2,
   X,
+  HelpCircle,
 } from "lucide-react";
 import { Category, Exercise, SetData, WorkoutLogEntry } from "@/types/workout";
-import { saveWorkoutLogs, createExercise } from "@/lib/api";
+import { saveWorkoutLogs, createExercise, getExerciseDetail } from "@/lib/api";
+import ExerciseThumbnail from "@/app/components/ExerciseThumbnail";
+import ExerciseDetailModal from "@/app/components/ExerciseDetailModal";
 
 interface Props {
   initialCategory: Category;
+  dailySessionId?: number;
+  backHref?: string;
 }
 
 type ToastState = {
@@ -35,21 +40,38 @@ type ToastState = {
   message: string;
 } | null;
 
-export default function WorkoutPlanner({ initialCategory }: Props) {
+export default function WorkoutPlanner({
+  initialCategory,
+  dailySessionId,
+  backHref = "/",
+}: Props) {
   const [activeExercises, setActiveExercises] = useState<Exercise[]>(() => {
     return initialCategory.exercises.map((ex) => ({
       ...ex,
-      targetSets: ex.targetSets || 3,
+      targetSets: ex.targetSets || ex.pivot?.default_sets || 3,
       notes: ex.notes || "",
-      setsData: Array.from({ length: ex.targetSets || 3 }, () => ({
-        weight: "",
-        reps: "",
-        rir: 1,
-        notes: "",
-        isCompleted: false,
-      })),
+      setsData: Array.from(
+        { length: ex.targetSets || ex.pivot?.default_sets || 3 },
+        () => ({
+          weight: "",
+          reps: "",
+          rir: 1,
+          notes: "",
+          isCompleted: false,
+        })
+      ),
     }));
   });
+
+  const [detailExercise, setDetailExercise] = useState<Exercise | null>(null);
+
+  const openHowToModal = async (exercise: Exercise) => {
+    setDetailExercise(exercise);
+    if (!exercise.instructions?.length && exercise.slug) {
+      const full = await getExerciseDetail(exercise.slug);
+      if (full) setDetailExercise(full);
+    }
+  };
 
   const [isTracking, setIsTracking] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -376,7 +398,7 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
     }
 
     setIsSaving(true);
-    const res = await saveWorkoutLogs(logsToSave);
+    const res = await saveWorkoutLogs(logsToSave, dailySessionId);
     setIsSaving(false);
 
     if (res.success) {
@@ -708,7 +730,7 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
                   {saveSuccess}
                 </p>
                 <Link
-                  href="/"
+                  href={backHref}
                   className="mt-4 inline-flex items-center justify-center w-full h-11 bg-[#141916] hover:bg-[#48524C] text-white rounded-xl text-sm font-semibold transition-colors"
                 >
                   Kembali ke Dashboard
@@ -841,13 +863,42 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
                   >
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2.5 mb-2.5">
-                          <span className="w-7 h-7 rounded-lg bg-[#ECEFE9] border border-[#DCE1D8] flex items-center justify-center text-xs font-bold font-mono tabular-nums text-[#141916] shrink-0">
-                            {idx + 1}
-                          </span>
-                          <h3 className="font-semibold text-base text-[#141916] truncate">
-                            {exercise.name}
-                          </h3>
+                        <div className="flex items-center justify-between gap-2 mb-2.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {exercise.images?.[0]?.url ? (
+                              <ExerciseThumbnail
+                                src={exercise.images[0].url}
+                                alt={exercise.name}
+                                className="w-12 h-12 rounded-xl shrink-0"
+                                sizes="48px"
+                              />
+                            ) : (
+                              <span className="w-7 h-7 rounded-lg bg-[#ECEFE9] border border-[#DCE1D8] flex items-center justify-center text-xs font-bold font-mono tabular-nums text-[#141916] shrink-0">
+                                {idx + 1}
+                              </span>
+                            )}
+                            <div className="min-w-0">
+                              <h3 className="font-semibold text-base text-[#141916] truncate">
+                                {exercise.name}
+                              </h3>
+                              {exercise.pivot?.default_rep_range && (
+                                <span className="text-xs text-[#626E67] font-mono tabular-nums">
+                                  Target: {exercise.pivot.default_rep_range} reps
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {(exercise.images?.length || exercise.instructions?.length) ? (
+                            <button
+                              type="button"
+                              onClick={() => openHowToModal(exercise)}
+                              className="h-9 px-3 bg-[#FFF1EA] hover:bg-[#F4C4AC]/50 border border-[#F4C4AC] text-[#C84B11] rounded-xl text-xs font-semibold flex items-center gap-1.5 shrink-0 cursor-pointer"
+                            >
+                              <HelpCircle className="w-3.5 h-3.5" />
+                              <span>Cara</span>
+                            </button>
+                          ) : null}
                         </div>
 
                         <input
@@ -1117,14 +1168,36 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
           {activeExercises.length > 0 && currentExercise ? (
             <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 sm:p-6 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#DCE1D8] gap-3 mb-5">
-                <div>
-                  <span className="inline-block text-xs font-mono tabular-nums font-semibold text-[#C84B11] bg-[#FFF1EA] border border-[#F4C4AC] px-2.5 py-0.5 rounded-lg mb-2">
-                    Gerakan {currentIndex + 1} dari {activeExercises.length}
-                  </span>
-                  <h2 className="text-2xl font-bold text-[#141916] tracking-tight">
-                    {currentExercise.name}
-                  </h2>
+                <div className="flex items-center gap-3.5 min-w-0">
+                  {currentExercise.images?.[0]?.url && (
+                    <ExerciseThumbnail
+                      src={currentExercise.images[0].url}
+                      alt={currentExercise.name}
+                      className="w-14 h-14 rounded-xl shrink-0"
+                      sizes="56px"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <span className="inline-block text-xs font-mono tabular-nums font-semibold text-[#C84B11] bg-[#FFF1EA] border border-[#F4C4AC] px-2.5 py-0.5 rounded-lg mb-1.5">
+                      Gerakan {currentIndex + 1} dari {activeExercises.length}
+                    </span>
+                    <h2 className="text-xl sm:text-2xl font-bold text-[#141916] tracking-tight truncate">
+                      {currentExercise.name}
+                    </h2>
+                  </div>
                 </div>
+
+                {(currentExercise.images?.length ||
+                  currentExercise.instructions?.length) ? (
+                  <button
+                    type="button"
+                    onClick={() => openHowToModal(currentExercise)}
+                    className="h-11 px-4 bg-[#FFF1EA] hover:bg-[#F4C4AC]/50 border border-[#F4C4AC] text-[#C84B11] rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 self-start sm:self-auto shrink-0 cursor-pointer"
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    <span>Cara Melakukan</span>
+                  </button>
+                ) : null}
               </div>
 
               {/* Exercise Cue Note */}
@@ -1515,6 +1588,11 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
           )}
         </div>
       )}
+
+      <ExerciseDetailModal
+        exercise={detailExercise}
+        onClose={() => setDetailExercise(null)}
+      />
     </div>
   );
 }

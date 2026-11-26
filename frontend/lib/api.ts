@@ -10,6 +10,10 @@ import {
   UserPlan,
   ScheduleWarning,
   SaveUserPlanPayload,
+  DailySession,
+  DailySessionStatus,
+  TodaySessionResponse,
+  WeeklyEvaluationResponse,
 } from '@/types/workout';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
@@ -377,12 +381,18 @@ export async function getCategoryById(id: string | number): Promise<Category | n
   }
 }
 
-export async function saveWorkoutLogs(logs: WorkoutLogEntry[]): Promise<{ success: boolean; message: string }> {
+export async function saveWorkoutLogs(
+  logs: WorkoutLogEntry[],
+  dailySessionId?: number
+): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch(`${API_BASE}/workout-logs`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ logs }),
+      body: JSON.stringify({
+        logs,
+        ...(dailySessionId ? { daily_session_id: dailySessionId } : {}),
+      }),
     });
 
     const data = await res.json();
@@ -632,5 +642,92 @@ export async function validateUserSchedule(
     return json.warnings || [];
   } catch {
     return [];
+  }
+}
+
+/* ========================================================================= */
+/* DAILY SESSIONS & WEEKLY EVALUATION APIS                                   */
+/* ========================================================================= */
+
+export async function getTodaySession(): Promise<TodaySessionResponse | null> {
+  try {
+    const res = await fetch(`${API_BASE}/daily-sessions/today`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function getDailySessionById(
+  id: number | string
+): Promise<DailySession | null> {
+  try {
+    const res = await fetch(`${API_BASE}/daily-sessions/${id}`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateDailySessionStatus(
+  id: number,
+  status: DailySessionStatus
+): Promise<{ success: boolean; message: string; data?: DailySession; conflict?: boolean }> {
+  try {
+    const res = await fetch(`${API_BASE}/daily-sessions/${id}/status`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        conflict: res.status === 409,
+        message: json.message || 'Gagal memperbarui status sesi.',
+      };
+    }
+    return {
+      success: true,
+      message: json.message || 'Status diperbarui.',
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message };
+  }
+}
+
+export async function getWeeklyEvaluation(
+  period: 'last_week' | 'current_week' = 'last_week'
+): Promise<{ success: boolean; data?: WeeklyEvaluationResponse; message?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/evaluation/weekly?period=${period}`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        message: json.message || 'Gagal memuat evaluasi mingguan.',
+      };
+    }
+    return {
+      success: true,
+      data: json.data,
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, message };
   }
 }

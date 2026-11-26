@@ -6,6 +6,8 @@ use App\Http\Controllers\WorkoutController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\TrainerController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\DailySessionController;
+use App\Http\Controllers\EvaluationController;
 use App\Http\Controllers\ExerciseController;
 use App\Http\Controllers\SplitController;
 use App\Http\Controllers\UserPlanController;
@@ -50,6 +52,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/plan', [UserPlanController::class, 'show']);
     Route::post('/user/plan', [UserPlanController::class, 'store']);
     Route::post('/user/plan/validate-schedule', [UserPlanController::class, 'validateSchedule']);
+
+    // Daily Sessions & Weekly Evaluation
+    Route::get('/daily-sessions/today', [DailySessionController::class, 'today']);
+    Route::get('/daily-sessions/{id}', [DailySessionController::class, 'show'])->whereNumber('id');
+    Route::patch('/daily-sessions/{id}/status', [DailySessionController::class, 'updateStatus'])->whereNumber('id');
+    Route::get('/evaluation/weekly', [EvaluationController::class, 'weekly']);
 
     // --- 4. Trainer Routes (Personal Trainer & Admin) ---
     Route::middleware('role:trainer,admin')->prefix('trainer')->group(function () {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\DailySession;
 use App\Models\Exercise;
 use App\Models\WorkoutLog;
 use Illuminate\Http\Request;
@@ -54,6 +55,7 @@ class WorkoutController extends Controller
     public function storeLogs(Request $request)
     {
         $validated = $request->validate([
+            'daily_session_id' => 'nullable|integer|exists:daily_sessions,id',
             'logs' => 'required|array|min:1',
             'logs.*.exercise_id' => 'required|exists:exercises,id',
             'logs.*.set_number' => 'required|integer|min:1',
@@ -64,14 +66,17 @@ class WorkoutController extends Controller
             'logs.*.notes' => 'nullable|string|max:1000',
         ]);
 
-        $userId = auth('sanctum')->id() ?? $request->user_id;
+        $authUser = auth('sanctum')->user();
+        $userId = $authUser?->id ?? $request->user_id;
+        $dailySessionId = $validated['daily_session_id'] ?? null;
 
-        $createdLogs = DB::transaction(function () use ($validated, $userId) {
+        $createdLogs = DB::transaction(function () use ($validated, $userId, $authUser, $dailySessionId) {
             $inserted = [];
             foreach ($validated['logs'] as $logData) {
                 $inserted[] = WorkoutLog::create([
                     'user_id' => $userId,
                     'exercise_id' => $logData['exercise_id'],
+                    'daily_session_id' => $dailySessionId,
                     'set_number' => $logData['set_number'],
                     'weight' => $logData['weight'],
                     'reps' => $logData['reps'],
@@ -80,6 +85,23 @@ class WorkoutController extends Controller
                     'notes' => $logData['notes'] ?? null,
                 ]);
             }
+
+            if ($dailySessionId && $userId) {
+                $dailySession = DailySession::find($dailySessionId);
+                if (
+                    $dailySession
+                    && $dailySession->user_id === (int) $userId
+                    && $dailySession->changed_by_role !== 'trainer'
+                ) {
+                    $dailySession->update([
+                        'status' => 'done',
+                        'completed_at' => now(),
+                        'changed_by' => (int) $userId,
+                        'changed_by_role' => $authUser?->role ?? 'client',
+                    ]);
+                }
+            }
+
             return $inserted;
         });
 

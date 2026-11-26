@@ -13,6 +13,7 @@ import {
   LayoutGrid,
   BookOpen,
   CalendarRange,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -76,6 +77,12 @@ export default function Navbar() {
         href: "/onboarding",
         label: "Atur Jadwal",
         icon: <CalendarRange className="w-4 h-4" />,
+        activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+      },
+      {
+        href: "/evaluation",
+        label: "Evaluasi",
+        icon: <BarChart3 className="w-4 h-4" />,
         activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
       },
       {

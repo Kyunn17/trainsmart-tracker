@@ -182,3 +182,76 @@ export interface SaveUserPlanPayload {
     split_session_id: number | null;
   }>;
 }
+
+export type DailySessionStatus = "pending" | "done" | "skipped" | "rest";
+
+export interface DailySession {
+  id: number;
+  user_id: number;
+  user_plan_id?: number | null;
+  split_session_id?: number | null;
+  session_date: string;
+  status: DailySessionStatus;
+  trainer_note?: string | null;
+  changed_by?: number | null;
+  changed_by_role?: string | null;
+  changedBy?: { id: number; name: string; role: UserRole } | null;
+  completed_at?: string | null;
+  user_plan?: UserPlan | null;
+  split_session?: SplitSession | null;
+  workout_logs?: WorkoutLogEntry[];
+}
+
+export interface WeekOverviewDay {
+  day_of_week: number;
+  day_short: string;
+  date: string;
+  is_today: boolean;
+  session_name: string;
+  status: DailySessionStatus;
+}
+
+export interface TodaySessionResponse {
+  status: string;
+  has_plan: boolean;
+  data: DailySession | null;
+  week_overview: WeekOverviewDay[];
+}
+
+export interface WeeklyEvaluationSuggestion {
+  type: "success" | "warning" | "info";
+  title: string;
+  message: string;
+  action_href?: string;
+  action_label?: string;
+}
+
+export interface WeeklyEvaluationDay {
+  day_of_week: number;
+  day_name: string;
+  date: string;
+  session_name: string;
+  status: DailySessionStatus;
+  sets_logged: number;
+  tonnage_kg: number;
+}
+
+export interface WeeklyEvaluationResponse {
+  period: "last_week" | "current_week";
+  period_start: string;
+  period_end: string;
+  has_plan: boolean;
+  split_name?: string | null;
+  scheduled_sessions: number;
+  completed_sessions: number;
+  skipped_sessions: number;
+  completion_percentage: number;
+  total_sets: number;
+  total_tonnage_kg: number;
+  previous_week_tonnage_kg: number;
+  tonnage_change_kg: number;
+  tonnage_change_percentage: number | null;
+  average_rir: number | null;
+  daily_breakdown: WeeklyEvaluationDay[];
+  suggestions: WeeklyEvaluationSuggestion[];
+}

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { getCategories, getWorkoutHistory } from "@/lib/api";
 import { Category, WorkoutLogEntry } from "@/types/workout";
+import TodayDashboardSection from "@/app/components/TodayDashboardSection";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +94,9 @@ export default async function Home() {
             </span>
           </div>
         </section>
+
+        {/* TODAY'S SCHEDULED SESSION & QUICK STATUS */}
+        <TodayDashboardSection />
 
         {/* WORKOUT CATEGORIES SPLITS */}
         <section aria-labelledby="splits-heading">
