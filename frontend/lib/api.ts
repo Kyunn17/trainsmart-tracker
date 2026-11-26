@@ -1,4 +1,4 @@
-import { Category, WorkoutLogEntry, User, ClientProgressResponse } from '@/types/workout';
+import { Category, WorkoutLogEntry, User, ClientProgressResponse, Split } from '@/types/workout';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
@@ -423,5 +423,52 @@ export async function getWorkoutHistory(): Promise<WorkoutLogEntry[]> {
   } catch (err) {
     console.error('Error fetching workout history:', err);
     return [];
+  }
+}
+
+/* ========================================================================= */
+/* SPLIT RECOMMENDATIONS & GUIDE APIS                                        */
+/* ========================================================================= */
+
+export async function getSplitRecommendations(days: number): Promise<{
+  success: boolean;
+  data: Split[];
+  message?: string;
+}> {
+  try {
+    const res = await fetch(`${API_BASE}/splits/recommendations?days=${days}`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        data: [],
+        message: json.message || 'Gagal memuat rekomendasi split.',
+      };
+    }
+    return {
+      success: true,
+      data: json.data || [],
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, data: [], message };
+  }
+}
+
+export async function getSplitById(id: number): Promise<Split | null> {
+  try {
+    const res = await fetch(`${API_BASE}/splits/${id}`, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data || null;
+  } catch (err) {
+    console.error(`Error fetching split #${id}:`, err);
+    return null;
   }
 }

@@ -69,4 +69,30 @@ class User extends Authenticatable
     {
         return $this->hasMany(WorkoutLog::class);
     }
+
+    // User workout plans
+    public function plans()
+    {
+        return $this->hasMany(UserPlan::class);
+    }
+
+    public function activePlan()
+    {
+        return $this->hasOne(UserPlan::class)->where('is_active', true);
+    }
+
+    public function dailySessions()
+    {
+        return $this->hasMany(DailySession::class);
+    }
+
+    public function sentCoachingRequests()
+    {
+        return $this->hasMany(CoachingRequest::class, 'client_id');
+    }
+
+    public function receivedCoachingRequests()
+    {
+        return $this->hasMany(CoachingRequest::class, 'trainer_id');
+    }
 }

@@ -2,141 +2,166 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  Dumbbell, 
-  LogOut, 
-  LogIn, 
-  ShieldAlert, 
-  Users, 
-  TrendingUp, 
-  Award 
+import {
+  Dumbbell,
+  LogOut,
+  LogIn,
+  ShieldAlert,
+  Users,
+  TrendingUp,
+  Award,
+  LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
-  const { user, logout, isLoading } = useAuth();
+  const { user, logout } = useAuth();
   const pathname = usePathname();
 
   const roleBadgeColor = {
-    admin: "bg-rose-500/10 text-rose-400 border-rose-500/30",
-    trainer: "bg-blue-500/10 text-blue-400 border-blue-500/30",
-    client: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+    admin: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
+    trainer: "bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]",
+    client: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
   };
 
+  const roleLabel = {
+    admin: "Admin",
+    trainer: "Trainer",
+    client: "Member",
+  };
+
+  const navItems: Array<{
+    href: string;
+    label: string;
+    icon: React.ReactNode;
+    activeClass: string;
+  }> = [
+    {
+      href: "/",
+      label: "Dashboard",
+      icon: <LayoutGrid className="w-4 h-4" />,
+      activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+    },
+  ];
+
+  if (user?.role === "admin") {
+    navItems.push({
+      href: "/admin",
+      label: "Admin Panel",
+      icon: <ShieldAlert className="w-4 h-4" />,
+      activeClass: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
+    });
+  }
+
+  if (user?.role === "trainer") {
+    navItems.push({
+      href: "/trainer",
+      label: `Klien Saya (${user.clients?.length || 0})`,
+      icon: <Users className="w-4 h-4" />,
+      activeClass: "bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]",
+    });
+  }
+
+  if (user?.role === "client") {
+    navItems.push(
+      {
+        href: "/client/trainer",
+        label: user.trainer ? `Trainer (${user.trainer.name.split(" ")[0]})` : "Pilih Trainer",
+        icon: <Award className="w-4 h-4" />,
+        activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+      },
+      {
+        href: "/client/progress",
+        label: "Progres Saya",
+        icon: <TrendingUp className="w-4 h-4" />,
+        activeClass: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
+      }
+    );
+  }
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-xl">
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Brand / Logo */}
-        <div className="flex items-center space-x-6">
-          <Link href="/" className="flex items-center space-x-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 flex items-center justify-center text-zinc-950 shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform">
-              <Dumbbell className="w-5 h-5 fill-zinc-950" />
+    <header className="sticky top-0 z-40 w-full border-b border-[#DCE1D8] bg-white">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        {/* Brand + Desktop Nav */}
+        <div className="flex items-center gap-6 min-w-0">
+          <Link href="/" className="flex items-center gap-3 group shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[#C84B11] group-hover:bg-[#A83D0B] flex items-center justify-center text-white transition-colors shadow-xs">
+              <Dumbbell className="w-5 h-5" />
             </div>
             <div className="flex flex-col">
-              <span className="font-black text-base tracking-tight text-white flex items-center">
-                TRAIN<span className="text-amber-400">SMART</span>
+              <span className="font-bold text-base tracking-tight text-[#141916] leading-tight">
+                TrainSmart
               </span>
-              <span className="text-[10px] text-zinc-500 font-mono tracking-wider -mt-1">
-                HYPERTROPHY OS
+              <span className="text-xs text-[#626E67] leading-tight">
+                Hypertrophy Tracker
               </span>
             </div>
           </Link>
 
-          {/* Navigation Links based on role */}
-          <nav className="hidden md:flex items-center space-x-1 text-xs font-semibold">
-            <Link
-              href="/"
-              className={`px-3 py-1.5 rounded-lg transition-colors ${
-                pathname === "/" ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Dashboard
-            </Link>
-
-            {user?.role === "admin" && (
-              <Link
-                href="/admin"
-                className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition-colors ${
-                  pathname === "/admin" ? "bg-rose-950/60 text-rose-300 border border-rose-500/30" : "text-zinc-400 hover:text-rose-400"
-                }`}
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>Admin Panel</span>
-              </Link>
-            )}
-
-            {user?.role === "trainer" && (
-              <Link
-                href="/trainer"
-                className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition-colors ${
-                  pathname === "/trainer" ? "bg-blue-950/60 text-blue-300 border border-blue-500/30" : "text-zinc-400 hover:text-blue-400"
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Klien Saya ({user.clients?.length || 0})</span>
-              </Link>
-            )}
-
-            {user?.role === "client" && (
-              <>
+          <nav aria-label="Navigasi utama" className="hidden md:flex items-center gap-1.5">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
                 <Link
-                  href="/client/trainer"
-                  className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition-colors ${
-                    pathname === "/client/trainer" ? "bg-amber-950/60 text-amber-300 border border-amber-500/30" : "text-zinc-400 hover:text-amber-400"
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`px-3.5 py-2 rounded-xl text-sm font-medium flex items-center gap-2 border transition-colors ${
+                    isActive
+                      ? `${item.activeClass} font-semibold`
+                      : "border-transparent text-[#48524C] hover:text-[#141916] hover:bg-[#ECEFE9]"
                   }`}
                 >
-                  <Award className="w-3.5 h-3.5" />
-                  <span>Pilih Trainer {user.trainer ? `(${user.trainer.name.split(" ")[0]})` : ""}</span>
+                  {item.icon}
+                  <span>{item.label}</span>
                 </Link>
-                <Link
-                  href="/client/progress"
-                  className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition-colors ${
-                    pathname === "/client/progress" ? "bg-emerald-950/60 text-emerald-300 border border-emerald-500/30" : "text-zinc-400 hover:text-emerald-400"
-                  }`}
-                >
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span>Progres Saya</span>
-                </Link>
-              </>
-            )}
+              );
+            })}
           </nav>
         </div>
 
-        {/* Right side: User Profile / Auth buttons */}
-        <div className="flex items-center space-x-3">
+        {/* User Profile / Auth Controls */}
+        <div className="flex items-center gap-2.5 shrink-0">
           {user ? (
-            <div className="flex items-center space-x-2">
-              <div className="flex flex-col text-right">
-                <span className="text-xs font-bold text-white leading-tight">{user.name}</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="hidden sm:flex flex-col text-right">
+                  <span className="text-sm font-semibold text-[#141916] leading-tight">
+                    {user.name}
+                  </span>
+                </div>
                 <span
-                  className={`text-[9px] uppercase font-mono font-bold px-1.5 py-0.2 rounded border self-end mt-0.5 ${
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-lg border ${
                     roleBadgeColor[user.role]
                   }`}
                 >
-                  {user.role}
+                  {roleLabel[user.role]}
                 </span>
               </div>
 
               <button
+                type="button"
                 onClick={logout}
-                className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-950/30 rounded-xl transition-colors"
-                title="Keluar / Logout"
+                className="h-10 px-3 text-sm font-medium text-[#48524C] hover:text-[#BE123C] hover:bg-[#FFF1F2] border border-[#DCE1D8] hover:border-[#FECDD3] rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                aria-label="Keluar dari akun"
+                title="Keluar"
               >
                 <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Keluar</span>
               </button>
             </div>
           ) : (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
               <Link
                 href="/login"
-                className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 rounded-xl text-xs font-bold text-white flex items-center space-x-1.5 transition-colors"
+                className="h-10 px-4 bg-white hover:bg-[#ECEFE9] border border-[#C5CCC0] rounded-xl text-sm font-semibold text-[#141916] flex items-center gap-1.5 transition-colors"
               >
-                <LogIn className="w-3.5 h-3.5" />
+                <LogIn className="w-4 h-4 text-[#48524C]" />
                 <span>Masuk</span>
               </Link>
               <Link
                 href="/register"
-                className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 rounded-xl text-xs font-black transition-all shadow-md shadow-amber-500/20"
+                className="h-10 px-4 bg-[#C84B11] hover:bg-[#A83D0B] text-white rounded-xl text-sm font-semibold flex items-center transition-colors shadow-xs"
               >
                 Daftar
               </Link>
@@ -144,6 +169,31 @@ export default function Navbar() {
           )}
         </div>
       </div>
+
+      {/* Mobile Navigation Strip */}
+      <nav
+        aria-label="Navigasi seluler"
+        className="md:hidden border-t border-[#DCE1D8] bg-[#F5F6F3] px-4 py-2 flex items-center gap-2 overflow-x-auto"
+      >
+        {navItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={isActive ? "page" : undefined}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 whitespace-nowrap border transition-colors ${
+                isActive
+                  ? `${item.activeClass} font-semibold`
+                  : "bg-white border-[#DCE1D8] text-[#48524C] hover:text-[#141916]"
+              }`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </header>
   );
 }

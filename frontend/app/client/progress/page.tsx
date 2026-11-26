@@ -2,24 +2,34 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { 
-  TrendingUp, 
-  Dumbbell, 
-  Flame, 
-  Award, 
-  Clock, 
-  ArrowLeft, 
-  Sparkles,
-  Zap 
+import {
+  Dumbbell,
+  Flame,
+  ArrowLeft,
+  Zap,
+  StickyNote,
+  TrendingUp,
 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
 import { getClientMyProgress } from "@/lib/api";
 import { WorkoutLogEntry, User } from "@/types/workout";
 
+function getRirBadgeStyle(rir: number | null | undefined) {
+  if (rir === 0) {
+    return "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]";
+  }
+  if (rir === 1 || rir === 2) {
+    return "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]";
+  }
+  return "bg-[#ECEFE9] text-[#48524C] border-[#DCE1D8]";
+}
+
 export default function ClientProgressPage() {
-  const { user } = useAuth();
   const [data, setData] = useState<{
-    summary: { total_sets: number; total_volume_kg: number; average_rir: number | null };
+    summary: {
+      total_sets: number;
+      total_volume_kg: number;
+      average_rir: number | null;
+    };
     trainer: User | null;
     logs: WorkoutLogEntry[];
   } | null>(null);
@@ -33,36 +43,34 @@ export default function ClientProgressPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-4 sm:p-8 relative">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
+    <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Navigation Breadcrumb */}
+        <div className="mb-5">
           <Link
             href="/"
-            className="inline-flex items-center space-x-2 text-xs font-semibold text-zinc-400 hover:text-amber-400 transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#48524C] hover:text-[#C84B11] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Kembali ke Beranda</span>
+            <span>Kembali ke Dashboard</span>
           </Link>
         </div>
 
         {/* Header */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-6 border-b border-[#DCE1D8]">
           <div>
-            <div className="flex items-center space-x-2 text-emerald-400 font-mono text-xs uppercase tracking-widest mb-1 font-bold">
-              <TrendingUp className="w-4 h-4" />
-              <span>Hypertrophy Analytics</span>
-            </div>
-            <h1 className="text-3xl font-black text-white tracking-tight">
-              Progres Latihan & Beban Anda
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#141916] tracking-tight flex items-center gap-2.5">
+              <TrendingUp className="w-7 h-7 text-[#047857]" />
+              <span>Progres Latihan & Beban Anda</span>
             </h1>
-            <p className="text-xs text-zinc-400 mt-1">
+            <p className="text-sm text-[#48524C] mt-1.5">
               Catatan progresif untuk memastikan stimulus mekanis otot bertambah setiap pekannya.
             </p>
           </div>
 
           <Link
             href="/"
-            className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-amber-500/20 flex items-center space-x-1.5 self-start sm:self-auto"
+            className="h-10 px-4 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm transition-colors flex items-center gap-2 self-start sm:self-auto shrink-0"
           >
             <Flame className="w-4 h-4" />
             <span>Latihan Sekarang</span>
@@ -70,17 +78,39 @@ export default function ClientProgressPage() {
         </div>
 
         {isLoading ? (
-          <div className="p-12 text-center text-zinc-500 text-xs">Memuat data progres...</div>
+          <div className="space-y-6" aria-busy="true" aria-label="Memuat data progres">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="p-5 bg-white border border-[#DCE1D8] rounded-2xl animate-pulse space-y-3"
+                >
+                  <div className="h-4 w-28 bg-[#ECEFE9] rounded" />
+                  <div className="h-8 w-20 bg-[#ECEFE9] rounded" />
+                  <div className="h-3 w-36 bg-[#ECEFE9] rounded" />
+                </div>
+              ))}
+            </div>
+            <div className="p-6 bg-white border border-[#DCE1D8] rounded-2xl animate-pulse space-y-3">
+              {[1, 2, 3, 4].map((row) => (
+                <div key={row} className="h-12 bg-[#ECEFE9] rounded-xl" />
+              ))}
+            </div>
+          </div>
         ) : !data || data.logs.length === 0 ? (
-          <div className="p-12 text-center bg-zinc-900/40 border border-zinc-800 rounded-3xl">
-            <Dumbbell className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-white mb-1">Belum Ada Sesi yang Disimpan</h3>
-            <p className="text-xs text-zinc-400 max-w-sm mx-auto mb-5">
-              Selesaikan set latihan Anda di dashboard dan klik "Simpan Sesi ke Database" untuk mulai merekam grafik progres hipertrofi Anda.
+          <div className="p-10 sm:p-12 text-center bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-[#ECEFE9] text-[#48524C] flex items-center justify-center mx-auto mb-4">
+              <Dumbbell className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-[#141916] mb-1.5">
+              Belum Ada Sesi yang Disimpan
+            </h2>
+            <p className="text-sm text-[#48524C] max-w-md mx-auto mb-6">
+              Selesaikan set latihan Anda dari dashboard dan simpan sesi untuk mulai merekam riwayat progres hipertrofi Anda.
             </p>
             <Link
               href="/"
-              className="inline-block px-5 py-2.5 bg-amber-500 text-zinc-950 font-bold rounded-xl text-xs hover:bg-amber-400 transition-colors"
+              className="inline-flex items-center justify-center h-11 px-6 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm transition-colors"
             >
               Mulai Sesi Pertama
             </Link>
@@ -89,107 +119,157 @@ export default function ClientProgressPage() {
           <div className="space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-5 bg-zinc-900/70 border border-zinc-800 rounded-2xl">
-                <div className="flex items-center justify-between text-zinc-400 text-xs mb-2">
+              <div className="p-5 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
+                <div className="flex items-center justify-between text-[#48524C] text-xs font-semibold mb-2">
                   <span>Total Set Terekam</span>
-                  <Dumbbell className="w-4 h-4 text-amber-400" />
+                  <Dumbbell className="w-4 h-4 text-[#C84B11]" />
                 </div>
-                <span className="text-3xl font-black text-white font-mono">
+                <span className="text-3xl font-bold text-[#141916] font-mono tabular-nums">
                   {data.summary.total_sets}
                 </span>
-                <span className="text-[10px] text-zinc-500 block mt-1">Set latihan tereksekusi</span>
-              </div>
-
-              <div className="p-5 bg-zinc-900/70 border border-zinc-800 rounded-2xl">
-                <div className="flex items-center justify-between text-zinc-400 text-xs mb-2">
-                  <span>Total Tonase Diangkat</span>
-                  <Flame className="w-4 h-4 text-emerald-400" />
-                </div>
-                <span className="text-3xl font-black text-emerald-400 font-mono">
-                  {data.summary.total_volume_kg.toLocaleString()} <span className="text-sm">kg</span>
+                <span className="text-xs text-[#626E67] block mt-1">
+                  Set latihan tereksekusi
                 </span>
-                <span className="text-[10px] text-zinc-500 block mt-1">Volume beban terakumulasi</span>
               </div>
 
-              <div className="p-5 bg-zinc-900/70 border border-zinc-800 rounded-2xl">
-                <div className="flex items-center justify-between text-zinc-400 text-xs mb-2">
-                  <span>Rata-rata Proksimitas RIR</span>
-                  <Zap className="w-4 h-4 text-blue-400" />
+              <div className="p-5 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
+                <div className="flex items-center justify-between text-[#48524C] text-xs font-semibold mb-2">
+                  <span>Total Tonase Diangkat</span>
+                  <Flame className="w-4 h-4 text-[#047857]" />
                 </div>
-                <span className="text-3xl font-black text-blue-400 font-mono">
+                <span className="text-3xl font-bold text-[#047857] font-mono tabular-nums">
+                  {data.summary.total_volume_kg.toLocaleString()}{" "}
+                  <span className="text-base font-semibold">kg</span>
+                </span>
+                <span className="text-xs text-[#626E67] block mt-1">
+                  Volume beban terakumulasi
+                </span>
+              </div>
+
+              <div className="p-5 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
+                <div className="flex items-center justify-between text-[#48524C] text-xs font-semibold mb-2">
+                  <span>Rata-rata Proksimitas RIR</span>
+                  <Zap className="w-4 h-4 text-[#1D4ED8]" />
+                </div>
+                <span className="text-3xl font-bold text-[#1D4ED8] font-mono tabular-nums">
                   {data.summary.average_rir ?? "-"}
                 </span>
-                <span className="text-[10px] text-zinc-500 block mt-1">
-                  Target optimal: 1-2 RIR sebelum failure
+                <span className="text-xs text-[#626E67] block mt-1">
+                  Target optimal: 1–2 RIR sebelum failure
                 </span>
               </div>
             </div>
 
             {/* Coach Banner */}
             {data.trainer && (
-              <div className="p-4 bg-blue-950/20 border border-blue-500/30 rounded-2xl flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-bold">
+              <div className="p-4 sm:p-5 bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-[#1D4ED8] text-white flex items-center justify-center font-bold text-sm shrink-0">
                     PT
                   </div>
                   <div>
-                    <span className="text-[10px] font-mono text-blue-400 uppercase tracking-wider block">
+                    <span className="text-xs font-semibold text-[#1D4ED8] block">
                       Personal Trainer Anda
                     </span>
-                    <span className="text-sm font-bold text-white">{data.trainer.name}</span>
-                    <span className="text-xs text-zinc-400 ml-2">• {data.trainer.specialization}</span>
+                    <span className="text-base font-bold text-[#141916]">
+                      {data.trainer.name}
+                    </span>
+                    {data.trainer.specialization && (
+                      <span className="text-xs text-[#48524C] block sm:inline sm:ml-2">
+                        • {data.trainer.specialization}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 <Link
                   href="/client/trainer"
-                  className="text-xs text-zinc-400 hover:text-white underline"
+                  className="text-xs font-semibold text-[#1D4ED8] hover:underline self-start sm:self-auto"
                 >
-                  Ganti Trainer
+                  Kelola / Ganti Trainer
                 </Link>
               </div>
             )}
 
             {/* Complete Log Feed */}
-            <div className="p-6 bg-zinc-900/60 border border-zinc-800 rounded-3xl">
-              <h3 className="text-base font-bold text-white mb-4">
-                Catatan Set & Beban Latihan ({data.logs.length} Set)
-              </h3>
+            <div className="bg-white border border-[#DCE1D8] rounded-2xl overflow-hidden shadow-xs">
+              <div className="px-6 py-4 bg-[#ECEFE9]/60 border-b border-[#DCE1D8] flex items-center justify-between">
+                <h2 className="text-base font-bold text-[#141916]">
+                  Catatan Set & Beban Latihan
+                </h2>
+                <span className="text-xs font-mono tabular-nums font-semibold text-[#48524C] bg-white border border-[#DCE1D8] px-3 py-1 rounded-lg">
+                  {data.logs.length} Set
+                </span>
+              </div>
 
-              <div className="space-y-2.5">
-                {data.logs.map((log: any) => (
+              <div className="divide-y divide-[#DCE1D8]">
+                <div className="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-[#F5F6F3] text-xs font-semibold text-[#626E67] uppercase tracking-wider">
+                  <div className="col-span-5">Gerakan & Kategori</div>
+                  <div className="col-span-2">Set</div>
+                  <div className="col-span-3">Beban & Repetisi</div>
+                  <div className="col-span-2 text-right">Intensitas</div>
+                </div>
+
+                {data.logs.map((log: WorkoutLogEntry) => (
                   <div
                     key={log.id}
-                    className="p-3.5 bg-zinc-950 border border-zinc-800/80 rounded-2xl text-xs flex items-center justify-between"
+                    className="px-6 py-4 hover:bg-[#F5F6F3]/70 transition-colors"
                   >
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <span className="font-bold text-white text-sm">
-                          {log.exercise?.name || `Gerakan #${log.exercise_id}`}
-                        </span>
-                        <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-start sm:items-center">
+                      <div className="sm:col-span-5 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-[#141916] text-sm">
+                            {log.exercise?.name ||
+                              `Gerakan #${log.exercise_id}`}
+                          </span>
+                          {(log.exercise as { category?: { name?: string } })
+                            ?.category?.name && (
+                            <span className="text-xs text-[#626E67] bg-[#ECEFE9] px-2 py-0.5 rounded-md">
+                              {
+                                (
+                                  log.exercise as {
+                                    category?: { name?: string };
+                                  }
+                                ).category?.name
+                              }
+                            </span>
+                          )}
+                        </div>
+                        {log.notes && (
+                          <p className="text-xs text-[#48524C] mt-1 flex items-center gap-1.5">
+                            <StickyNote className="w-3.5 h-3.5 text-[#C84B11] shrink-0" />
+                            <span>{log.notes}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="sm:col-span-2 flex items-center justify-between sm:justify-start">
+                        <span className="text-xs font-mono tabular-nums font-semibold text-[#48524C] bg-[#ECEFE9] border border-[#DCE1D8] px-2.5 py-1 rounded-lg">
                           Set {log.set_number}
                         </span>
-                        {log.exercise?.category && (
-                          <span className="text-[10px] text-zinc-500 font-mono">
-                            • {log.exercise.category.name}
+                        <span className="sm:hidden font-mono tabular-nums font-bold text-[#047857] text-sm">
+                          {log.weight} kg × {log.reps} reps
+                        </span>
+                      </div>
+
+                      <div className="hidden sm:block sm:col-span-3 font-mono tabular-nums font-semibold text-[#047857] text-sm">
+                        {log.weight} kg × {log.reps} reps
+                      </div>
+
+                      <div className="sm:col-span-2 flex items-center sm:justify-end gap-2">
+                        <span
+                          className={`text-xs font-mono tabular-nums font-semibold px-2.5 py-1 rounded-lg border ${getRirBadgeStyle(
+                            log.rir
+                          )}`}
+                        >
+                          RIR {log.rir ?? "-"}
+                        </span>
+                        {log.rpe && (
+                          <span className="text-xs font-mono tabular-nums text-[#626E67]">
+                            RPE {log.rpe}
                           </span>
                         )}
                       </div>
-                      {log.notes && (
-                        <p className="text-zinc-400 italic text-[11px]">
-                          📝 "{log.notes}"
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-emerald-400 font-mono font-bold text-sm block">
-                        {log.weight} kg × {log.reps} reps
-                      </span>
-                      <span className="text-[10px] text-zinc-400 font-mono">
-                        RIR {log.rir ?? "-"} {log.rpe ? `• RPE ${log.rpe}` : ""}
-                      </span>
                     </div>
                   </div>
                 ))}

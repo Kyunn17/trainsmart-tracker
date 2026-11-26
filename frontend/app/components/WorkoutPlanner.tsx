@@ -2,23 +2,26 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { 
-  Dumbbell, 
-  Timer, 
-  CheckCircle2, 
-  Plus, 
-  Trash2, 
-  Sparkles, 
-  Flame, 
-  ChevronRight, 
-  ChevronLeft, 
-  Save, 
-  ArrowLeft, 
-  Trophy, 
+import {
+  Dumbbell,
+  Timer,
+  CheckCircle2,
+  Plus,
+  Minus,
+  Trash2,
+  Flame,
+  ChevronRight,
+  ChevronLeft,
+  Save,
+  Trophy,
   Info,
   Clock,
   Zap,
-  StickyNote
+  StickyNote,
+  AlertCircle,
+  Minimize2,
+  Maximize2,
+  X,
 } from "lucide-react";
 import { Category, Exercise, SetData, WorkoutLogEntry } from "@/types/workout";
 import { saveWorkoutLogs, createExercise } from "@/lib/api";
@@ -27,8 +30,12 @@ interface Props {
   initialCategory: Category;
 }
 
+type ToastState = {
+  type: "info" | "warning" | "success" | "error";
+  message: string;
+} | null;
+
 export default function WorkoutPlanner({ initialCategory }: Props) {
-  // Normalize exercises with hypertrophy fields
   const [activeExercises, setActiveExercises] = useState<Exercise[]>(() => {
     return initialCategory.exercises.map((ex) => ({
       ...ex,
@@ -37,7 +44,7 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
       setsData: Array.from({ length: ex.targetSets || 3 }, () => ({
         weight: "",
         reps: "",
-        rir: 1, // Default 1-2 RIR (optimal hypertrophy target)
+        rir: 1,
         notes: "",
         isCompleted: false,
       })),
@@ -54,24 +61,51 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
 
   // Rest Timer state
   const [isResting, setIsResting] = useState(false);
-  const [restTimeLeft, setRestTimeLeft] = useState(120); // 120s default rest for hypertrophy
+  const [isRestMinimized, setIsRestMinimized] = useState(false);
+  const [restTimeLeft, setRestTimeLeft] = useState(120);
   const [initialRestDuration, setInitialRestDuration] = useState(120);
 
-  // Notes & UI drawer
-  const [activeSetNoteModal, setActiveSetNoteModal] = useState<{ exerciseIndex: number; setIndex: number } | null>(null);
+  // Notes & UI modal
+  const [activeSetNoteModal, setActiveSetNoteModal] = useState<{
+    exerciseIndex: number;
+    setIndex: number;
+  } | null>(null);
   const [tempNoteText, setTempNoteText] = useState("");
 
   // Workout Summary & Save Modal
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
 
-  // Trigger temporary toast
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+  const showToast = (
+    message: string,
+    type: "info" | "warning" | "success" | "error" = "info"
+  ) => {
+    setToast({ message, type });
   };
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // Escape key closes active modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (activeSetNoteModal) {
+        setActiveSetNoteModal(null);
+      } else if (isSummaryOpen) {
+        setIsSummaryOpen(false);
+      } else if (isResting && !isRestMinimized) {
+        setIsRestMinimized(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeSetNoteModal, isSummaryOpen, isResting, isRestMinimized]);
 
   // Workout duration timer
   useEffect(() => {
@@ -89,7 +123,11 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
       setRestTimeLeft((prev) => {
         if (prev <= 1) {
           setIsResting(false);
-          showToast("⏰ Waktu istirahat selesai! Siap untuk set berikutnya.");
+          setIsRestMinimized(false);
+          setToast({
+            type: "success",
+            message: "Waktu istirahat selesai. Siap untuk set berikutnya.",
+          });
           return 120;
         }
         return prev - 1;
@@ -102,6 +140,22 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
     setInitialRestDuration(seconds);
     setRestTimeLeft(seconds);
     setIsResting(true);
+    setIsRestMinimized(false);
+  };
+
+  const adjustRestTime = (delta: number) => {
+    setRestTimeLeft((prev) => {
+      const next = prev + delta;
+      if (next <= 0) {
+        setIsResting(false);
+        setIsRestMinimized(false);
+        return 120;
+      }
+      if (next > initialRestDuration) {
+        setInitialRestDuration(next);
+      }
+      return next;
+    });
   };
 
   // Modify target sets
@@ -136,8 +190,14 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
 
   // Delete exercise
   const hapusGerakan = (idGerakan: number) => {
-    setActiveExercises((prev) => prev.filter((g) => g.id !== idGerakan));
-    showToast("Gerakan dihapus dari sesi ini.");
+    setActiveExercises((prev) => {
+      const filtered = prev.filter((g) => g.id !== idGerakan);
+      if (currentIndex >= filtered.length && filtered.length > 0) {
+        setCurrentIndex(filtered.length - 1);
+      }
+      return filtered;
+    });
+    showToast("Gerakan dihapus dari sesi ini.", "info");
   };
 
   // Add custom exercise
@@ -146,7 +206,10 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
     setIsAddingExercise(true);
 
     try {
-      const res = await createExercise(initialCategory.id, namaGerakanBaru.trim());
+      const res = await createExercise(
+        initialCategory.id,
+        namaGerakanBaru.trim()
+      );
       const newId = res?.data?.id || Date.now();
 
       const newExercise: Exercise = {
@@ -166,9 +229,8 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
 
       setActiveExercises((prev) => [...prev, newExercise]);
       setNamaGerakanBaru("");
-      showToast(`Gerakan "${newExercise.name}" ditambahkan!`);
+      showToast(`Gerakan "${newExercise.name}" ditambahkan.`, "success");
     } catch {
-      // Local fallback
       const newExercise: Exercise = {
         id: Date.now(),
         category_id: initialCategory.id,
@@ -185,17 +247,17 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
       };
       setActiveExercises((prev) => [...prev, newExercise]);
       setNamaGerakanBaru("");
+      showToast(`Gerakan "${newExercise.name}" ditambahkan secara lokal.`, "info");
     } finally {
       setIsAddingExercise(false);
     }
   };
 
-  // Input change for set
   const updateSetField = (
     idGerakan: number,
     setIndex: number,
     field: keyof SetData,
-    value: any
+    value: string | number | boolean
   ) => {
     setActiveExercises((prev) =>
       prev.map((ex) => {
@@ -205,8 +267,10 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
             ? { ...updatedSets[setIndex] }
             : { weight: "", reps: "", rir: 1, notes: "", isCompleted: false };
 
-          (currentSet as any)[field] = value;
-          updatedSets[setIndex] = currentSet;
+          updatedSets[setIndex] = {
+            ...currentSet,
+            [field]: value,
+          };
 
           return { ...ex, setsData: updatedSets };
         }
@@ -215,14 +279,13 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
     );
   };
 
-  // Exercise notes update
   const updateExerciseNotes = (idGerakan: number, notes: string) => {
     setActiveExercises((prev) =>
       prev.map((ex) => (ex.id === idGerakan ? { ...ex, notes } : ex))
     );
   };
 
-  // Toggle set completed with hypertrophy validation
+  // Toggle set completed with sequential & input validation
   const toggleSetCompleted = (idGerakan: number, setIndex: number) => {
     setActiveExercises((prev) =>
       prev.map((ex) => {
@@ -233,26 +296,28 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
             : { weight: "", reps: "", rir: 1, notes: "", isCompleted: false };
 
           if (!currentSet.isCompleted) {
-            // Require previous set completion
             if (setIndex > 0 && !currentSets[setIndex - 1]?.isCompleted) {
-              showToast("⚠️ Selesaikan set sebelumnya terlebih dahulu!");
+              showToast("Selesaikan set sebelumnya terlebih dahulu.", "warning");
               return ex;
             }
 
-            // Require weight & reps
             if (!currentSet.weight || !currentSet.reps) {
-              showToast("⚠️ Masukkan beban (KG) dan repetisi sebelum mencentang!");
+              showToast(
+                "Masukkan beban (KG) dan repetisi sebelum mencentang set.",
+                "warning"
+              );
               return ex;
             }
 
             currentSet.isCompleted = true;
             currentSets[setIndex] = currentSet;
 
-            // Trigger rest timer
             startRestTimer(120);
-            showToast(`🔥 Set ${setIndex + 1} Selesai! Istirahat 2 menit untuk pemulihan otot.`);
+            showToast(
+              `Set ${setIndex + 1} selesai. Timer istirahat 2 menit dimulai.`,
+              "success"
+            );
           } else {
-            // Uncheck
             currentSet.isCompleted = false;
             currentSets[setIndex] = currentSet;
           }
@@ -264,7 +329,6 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
     );
   };
 
-  // Calculate live session statistics
   const totalCompletedSets = activeExercises.reduce((acc, ex) => {
     return acc + (ex.setsData?.filter((s) => s.isCompleted).length || 0);
   }, 0);
@@ -278,14 +342,13 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
       acc +
       (ex.setsData?.reduce((sAcc, s) => {
         if (s.isCompleted && s.weight && s.reps) {
-          return sAcc + parseFloat(s.weight) * parseInt(s.reps);
+          return sAcc + parseFloat(s.weight) * parseInt(s.reps, 10);
         }
         return sAcc;
       }, 0) || 0)
     );
   }, 0);
 
-  // Save session to backend
   const handleSaveWorkout = async () => {
     const logsToSave: WorkoutLogEntry[] = [];
 
@@ -296,7 +359,7 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
             exercise_id: ex.id,
             set_number: idx + 1,
             weight: parseFloat(s.weight),
-            reps: parseInt(s.reps),
+            reps: parseInt(s.reps, 10),
             rir: s.rir ?? 1,
             notes: s.notes || ex.notes || null,
           });
@@ -305,7 +368,10 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
     });
 
     if (logsToSave.length === 0) {
-      showToast("⚠️ Belum ada set yang diselesaikan untuk disimpan!");
+      showToast(
+        "Belum ada set yang diselesaikan untuk disimpan.",
+        "warning"
+      );
       return;
     }
 
@@ -315,9 +381,9 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
 
     if (res.success) {
       setSaveSuccess(res.message);
-      showToast("🎉 Latihan berhasil disimpan ke database!");
+      showToast("Latihan berhasil disimpan ke database.", "success");
     } else {
-      showToast(`❌ ${res.message}`);
+      showToast(res.message || "Gagal menyimpan latihan.", "error");
     }
   };
 
@@ -328,61 +394,191 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
   };
 
   const currentExercise = activeExercises[currentIndex] || activeExercises[0];
+  const progressPct =
+    totalPlannedSets > 0
+      ? Math.round((totalCompletedSets / totalPlannedSets) * 100)
+      : 0;
+
+  // Rest ring math
+  const ringRadius = 64;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const restRatio =
+    initialRestDuration > 0
+      ? Math.max(0, Math.min(1, restTimeLeft / initialRestDuration))
+      : 0;
+  const ringDashOffset = ringCircumference * (1 - restRatio);
 
   return (
     <div className="relative">
       {/* TOAST NOTIFICATION */}
-      {toastMessage && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce bg-zinc-900 border border-amber-500/50 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 text-sm backdrop-blur-md">
-          <Sparkles className="w-5 h-5 text-amber-400" />
-          <span className="font-medium">{toastMessage}</span>
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[#141916] text-white px-4 py-3 rounded-xl shadow-lg border border-[#48524C] flex items-center gap-2.5 text-sm max-w-[92vw]"
+        >
+          {toast.type === "success" ? (
+            <CheckCircle2 className="w-4 h-4 text-[#34D399] shrink-0" />
+          ) : toast.type === "warning" || toast.type === "error" ? (
+            <AlertCircle className="w-4 h-4 text-[#FB7185] shrink-0" />
+          ) : (
+            <Clock className="w-4 h-4 text-[#FDBA74] shrink-0" />
+          )}
+          <span className="font-medium">{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="ml-1 p-1 text-[#C5CCC0] hover:text-white rounded-md cursor-pointer"
+            aria-label="Tutup notifikasi"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
-      {/* REST TIMER POPUP MODAL */}
-      {isResting && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl text-center max-w-sm w-full shadow-2xl relative overflow-hidden">
-            <div className="absolute -top-12 -right-12 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl" />
-            <div className="flex items-center justify-center space-x-2 text-amber-400 mb-2 font-mono text-xs uppercase tracking-widest">
-              <Timer className="w-4 h-4 animate-spin" />
-              <span>Hypertrophy Rest Period</span>
+      {/* MINIMIZED REST TIMER BANNER */}
+      {isResting && isRestMinimized && (
+        <div className="mb-4 p-3.5 bg-[#FFF1EA] border border-[#F4C4AC] rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#C84B11] text-white flex items-center justify-center">
+              <Timer className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-xs font-semibold text-[#C84B11] block">
+                Timer Istirahat Berjalan
+              </span>
+              <span className="text-lg font-bold font-mono tabular-nums text-[#141916]">
+                {formatTime(restTimeLeft)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => adjustRestTime(30)}
+              className="h-9 px-3 bg-white hover:bg-[#ECEFE9] border border-[#F4C4AC] text-[#141916] rounded-xl text-xs font-semibold cursor-pointer"
+            >
+              +30d
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsResting(false);
+                setIsRestMinimized(false);
+              }}
+              className="h-9 px-3 bg-[#C84B11] hover:bg-[#A83D0B] text-white rounded-xl text-xs font-semibold cursor-pointer"
+            >
+              Lewati
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsRestMinimized(false)}
+              className="h-9 w-9 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] text-[#48524C] rounded-xl flex items-center justify-center cursor-pointer"
+              aria-label="Perbesar timer istirahat"
+              title="Perbesar timer"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* REST TIMER MODAL */}
+      {isResting && !isRestMinimized && (
+        <div
+          className="fixed inset-0 bg-[#141916]/60 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rest-timer-title"
+        >
+          <div className="bg-white border border-[#DCE1D8] p-6 sm:p-8 rounded-2xl text-center max-w-sm w-full shadow-xl relative">
+            <button
+              type="button"
+              onClick={() => setIsRestMinimized(true)}
+              className="absolute top-4 right-4 h-9 w-9 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#48524C] rounded-xl flex items-center justify-center cursor-pointer"
+              aria-label="Perkecil timer istirahat"
+              title="Perkecil"
+            >
+              <Minimize2 className="w-4 h-4" />
+            </button>
+
+            <div className="inline-flex items-center gap-2 text-[#C84B11] font-semibold text-xs px-3 py-1 rounded-lg bg-[#FFF1EA] border border-[#F4C4AC]">
+              <Timer className="w-4 h-4" />
+              <span id="rest-timer-title">Waktu Istirahat Set</span>
             </div>
 
-            {/* Glowing circular progress indicator */}
+            {/* SVG Circular Countdown */}
             <div className="my-6 relative flex items-center justify-center">
-              <div className="w-40 h-40 rounded-full border-4 border-zinc-800 flex flex-col items-center justify-center relative">
-                <span className="text-5xl font-black tracking-tight text-white font-mono">
+              <svg className="w-40 h-40 -rotate-90" viewBox="0 0 160 160">
+                <circle
+                  cx="80"
+                  cy="80"
+                  r={ringRadius}
+                  fill="none"
+                  stroke="#ECEFE9"
+                  strokeWidth="8"
+                />
+                <circle
+                  cx="80"
+                  cy="80"
+                  r={ringRadius}
+                  fill="none"
+                  stroke="#C84B11"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={ringCircumference}
+                  strokeDashoffset={ringDashOffset}
+                  className="transition-[stroke-dashoffset] duration-700 ease-linear"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-4xl font-bold tracking-tight text-[#141916] font-mono tabular-nums">
                   {formatTime(restTimeLeft)}
                 </span>
-                <span className="text-xs text-zinc-500 mt-1">Sisa Detik</span>
+                <span className="text-xs text-[#626E67] mt-1">Sisa Waktu</span>
               </div>
             </div>
 
-            <div className="p-3 bg-zinc-950/70 rounded-xl border border-zinc-800 mb-6 text-left">
-              <div className="flex items-center space-x-2 text-xs font-semibold text-amber-400 mb-1">
+            <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] mb-5 text-left">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#C84B11] mb-1">
                 <Zap className="w-3.5 h-3.5" />
-                <span>Tips Hipertrofi:</span>
+                <span>Tips Hipertrofi</span>
               </div>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Istirahat 2-3 menit pada gerakan compound memungkinkan pemulihan cadangan phosphocreatine (ATP) penuh agar beban set selanjutnya tetap optimal.
+              <p className="text-xs text-[#48524C] leading-relaxed">
+                Istirahat 2–3 menit membantu pemulihan ATP agar kualitas repetisi pada set berikutnya tetap terjaga.
               </p>
             </div>
 
             <div className="space-y-2.5">
               <button
-                onClick={() => setIsResting(false)}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 text-sm"
+                type="button"
+                onClick={() => {
+                  setIsResting(false);
+                  setIsRestMinimized(false);
+                }}
+                className="w-full h-11 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl transition-colors text-sm cursor-pointer"
               >
                 Lewati Istirahat (Siap Set)
               </button>
-              <button
-                onClick={() => setRestTimeLeft((prev) => prev + 30)}
-                className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-semibold rounded-xl transition-colors text-xs flex items-center justify-center space-x-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Tambah 30 Detik</span>
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => adjustRestTime(-15)}
+                  className="h-10 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#141916] font-semibold rounded-xl transition-colors text-xs flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                  <span>15 Detik</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustRestTime(30)}
+                  className="h-10 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#141916] font-semibold rounded-xl transition-colors text-xs flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>30 Detik</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -390,87 +586,153 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
 
       {/* SUMMARY & FINISH MODAL */}
       {isSummaryOpen && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 p-6 md:p-8 rounded-3xl max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-[#141916]/65 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="summary-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsSummaryOpen(false);
+          }}
+        >
+          <div className="bg-white border border-[#DCE1D8] p-6 sm:p-7 rounded-2xl max-w-lg w-full shadow-xl max-h-[90vh] overflow-y-auto relative">
+            <button
+              type="button"
+              onClick={() => setIsSummaryOpen(false)}
+              className="absolute top-4 right-4 h-9 w-9 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#48524C] rounded-xl flex items-center justify-center cursor-pointer"
+              aria-label="Tutup ringkasan"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
             <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto mb-3 text-amber-400">
-                <Trophy className="w-8 h-8" />
+              <div className="w-14 h-14 bg-[#FFF1EA] border border-[#F4C4AC] rounded-2xl flex items-center justify-center mx-auto mb-3 text-[#C84B11]">
+                <Trophy className="w-7 h-7" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Sesi Selesai! Kerja Bagus 🔥</h2>
-              <p className="text-zinc-400 text-sm mt-1">
-                Ringkasan progres hipertrofi untuk sesi {initialCategory.name}
+              <h2
+                id="summary-modal-title"
+                className="text-2xl font-bold text-[#141916]"
+              >
+                Ringkasan Sesi Latihan
+              </h2>
+              <p className="text-[#48524C] text-sm mt-1">
+                Evaluasi total set dan volume untuk sesi {initialCategory.name}
               </p>
             </div>
 
             {/* Quick Metrics */}
             <div className="grid grid-cols-3 gap-3 mb-6">
-              <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 text-center">
-                <span className="text-xs text-zinc-400 block mb-1">Total Set</span>
-                <span className="text-xl font-bold text-amber-400">{totalCompletedSets}</span>
+              <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] text-center">
+                <span className="text-xs text-[#626E67] block mb-1">
+                  Total Set
+                </span>
+                <span className="text-xl font-bold font-mono tabular-nums text-[#C84B11]">
+                  {totalCompletedSets}
+                </span>
               </div>
-              <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 text-center">
-                <span className="text-xs text-zinc-400 block mb-1">Total Volume</span>
-                <span className="text-xl font-bold text-emerald-400">{totalVolumeKg.toLocaleString()} kg</span>
+              <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] text-center">
+                <span className="text-xs text-[#626E67] block mb-1">
+                  Total Volume
+                </span>
+                <span className="text-xl font-bold font-mono tabular-nums text-[#047857]">
+                  {totalVolumeKg.toLocaleString()} kg
+                </span>
               </div>
-              <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 text-center">
-                <span className="text-xs text-zinc-400 block mb-1">Durasi</span>
-                <span className="text-xl font-bold text-blue-400">{formatTime(workoutSeconds)}</span>
+              <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] text-center">
+                <span className="text-xs text-[#626E67] block mb-1">
+                  Durasi
+                </span>
+                <span className="text-xl font-bold font-mono tabular-nums text-[#1D4ED8]">
+                  {formatTime(workoutSeconds)}
+                </span>
               </div>
             </div>
 
             {/* Exercise Breakdown */}
             <div className="space-y-3 mb-6">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
-                Catatan Set & Hipertrofi
-              </h4>
-              {activeExercises.map((ex) => {
-                const doneSets = ex.setsData?.filter((s) => s.isCompleted) || [];
-                if (doneSets.length === 0) return null;
-                return (
-                  <div key={ex.id} className="p-3.5 bg-zinc-950 rounded-xl border border-zinc-800 text-sm">
-                    <div className="flex justify-between items-center mb-1.5">
-                      <span className="font-semibold text-white">{ex.name}</span>
-                      <span className="text-xs text-amber-400 font-mono">{doneSets.length} Set</span>
-                    </div>
-                    {ex.notes && (
-                      <p className="text-xs text-zinc-400 italic mb-2">📝 {ex.notes}</p>
-                    )}
-                    <div className="flex flex-wrap gap-1.5">
-                      {doneSets.map((s, idx) => (
-                        <span key={idx} className="text-xs bg-zinc-900 border border-zinc-700/60 px-2.5 py-1 rounded-md text-zinc-300">
-                          Set {idx + 1}: <strong className="text-white">{s.weight}kg</strong> × {s.reps} reps (RIR {s.rir})
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#626E67]">
+                Rincian Set Terselesaikan
+              </h3>
+              {totalCompletedSets === 0 ? (
+                <div className="p-4 bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl text-sm text-[#48524C] text-center">
+                  Belum ada set yang ditandai selesai pada sesi ini.
+                </div>
+              ) : (
+                activeExercises.map((ex) => {
+                  const doneSets =
+                    ex.setsData?.filter((s) => s.isCompleted) || [];
+                  if (doneSets.length === 0) return null;
+                  return (
+                    <div
+                      key={ex.id}
+                      className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] text-sm"
+                    >
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="font-semibold text-[#141916]">
+                          {ex.name}
                         </span>
-                      ))}
+                        <span className="text-xs text-[#C84B11] font-mono tabular-nums font-semibold">
+                          {doneSets.length} Set
+                        </span>
+                      </div>
+                      {ex.notes && (
+                        <p className="text-xs text-[#48524C] mb-2 flex items-center gap-1.5">
+                          <StickyNote className="w-3.5 h-3.5 text-[#C84B11] shrink-0" />
+                          <span>{ex.notes}</span>
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {doneSets.map((s, idx) => (
+                          <span
+                            key={idx}
+                            className="text-xs font-mono tabular-nums bg-white border border-[#DCE1D8] px-2.5 py-1 rounded-lg text-[#48524C]"
+                          >
+                            Set {idx + 1}:{" "}
+                            <strong className="text-[#141916]">
+                              {s.weight} kg
+                            </strong>{" "}
+                            × {s.reps} (RIR {s.rir})
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             {saveSuccess ? (
-              <div className="p-4 bg-emerald-950/40 border border-emerald-500/50 rounded-2xl text-center mb-4">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-                <p className="text-emerald-300 font-semibold text-sm">{saveSuccess}</p>
+              <div className="p-4 bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl text-center">
+                <CheckCircle2 className="w-8 h-8 text-[#047857] mx-auto mb-2" />
+                <p className="text-[#047857] font-semibold text-sm">
+                  {saveSuccess}
+                </p>
                 <Link
                   href="/"
-                  className="mt-4 inline-block w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-semibold transition-colors"
+                  className="mt-4 inline-flex items-center justify-center w-full h-11 bg-[#141916] hover:bg-[#48524C] text-white rounded-xl text-sm font-semibold transition-colors"
                 >
                   Kembali ke Dashboard
                 </Link>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <button
+                  type="button"
                   onClick={handleSaveWorkout}
-                  disabled={isSaving}
-                  className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-zinc-950 font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 text-sm flex items-center justify-center space-x-2 disabled:opacity-50"
+                  disabled={isSaving || totalCompletedSets === 0}
+                  className="w-full h-11 bg-[#047857] hover:bg-[#065F46] disabled:opacity-50 text-white font-semibold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Save className="w-4 h-4" />
-                  <span>{isSaving ? "Menyimpan ke Database..." : "Simpan Sesi ke Database"}</span>
+                  <span>
+                    {isSaving
+                      ? "Menyimpan ke Database..."
+                      : "Simpan Sesi ke Database"}
+                  </span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setIsSummaryOpen(false)}
-                  className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-xl text-xs font-semibold transition-colors"
+                  className="w-full h-10 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#48524C] hover:text-[#141916] rounded-xl text-sm font-semibold transition-colors cursor-pointer"
                 >
                   Lanjut Latihan
                 </button>
@@ -482,37 +744,55 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
 
       {/* MODAL FOR INDIVIDUAL SET NOTE */}
       {activeSetNoteModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl max-w-sm w-full shadow-2xl">
-            <h3 className="text-base font-bold text-white mb-2 flex items-center space-x-2">
-              <StickyNote className="w-4 h-4 text-amber-400" />
+        <div
+          className="fixed inset-0 bg-[#141916]/60 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="set-note-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveSetNoteModal(null);
+          }}
+        >
+          <div className="bg-white border border-[#DCE1D8] p-6 rounded-2xl max-w-sm w-full shadow-xl">
+            <h3
+              id="set-note-title"
+              className="text-base font-bold text-[#141916] mb-1.5 flex items-center gap-2"
+            >
+              <StickyNote className="w-4 h-4 text-[#C84B11]" />
               <span>Catatan Set {activeSetNoteModal.setIndex + 1}</span>
             </h3>
-            <p className="text-xs text-zinc-400 mb-3">
-              Catat sensasi otot, tempo (misal 3-1-1), pompa otot, atau drop set.
+            <p className="text-xs text-[#48524C] mb-3">
+              Catat sensasi otot, tempo (misal 3-1-1), atau teknik tambahan seperti drop set.
             </p>
             <textarea
               rows={3}
-              placeholder="Contoh: Terasa kontraksi maksimal di puncak, drop set 2 reps terakhir..."
+              placeholder="Contoh: Kontraksi maksimal di puncak, drop set 2 reps terakhir..."
               value={tempNoteText}
               onChange={(e) => setTempNoteText(e.target.value)}
-              className="w-full p-3 bg-zinc-950 border border-zinc-700 rounded-xl text-white text-sm outline-none focus:border-amber-500 mb-4"
+              className="w-full p-3 bg-white border border-[#C5CCC0] rounded-xl text-[#141916] placeholder:text-[#626E67] text-sm outline-none focus:border-[#C84B11] mb-4"
             />
-            <div className="flex space-x-2">
+            <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => {
                   const ex = activeExercises[activeSetNoteModal.exerciseIndex];
-                  updateSetField(ex.id, activeSetNoteModal.setIndex, "notes", tempNoteText);
+                  updateSetField(
+                    ex.id,
+                    activeSetNoteModal.setIndex,
+                    "notes",
+                    tempNoteText
+                  );
                   setActiveSetNoteModal(null);
-                  showToast("Catatan set tersimpan!");
+                  showToast("Catatan set tersimpan.", "success");
                 }}
-                className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold rounded-lg text-sm"
+                className="flex-1 h-10 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm cursor-pointer"
               >
                 Simpan
               </button>
               <button
+                type="button"
                 onClick={() => setActiveSetNoteModal(null)}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg text-sm"
+                className="px-4 h-10 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#48524C] font-semibold rounded-xl text-sm cursor-pointer"
               >
                 Batal
               </button>
@@ -525,379 +805,709 @@ export default function WorkoutPlanner({ initialCategory }: Props) {
         /* ========================================================================= */
         /* FASE 1: PERSIAPAN & CUSTOMISASI JADWAL HIPERTROFI                          */
         /* ========================================================================= */
-        <div className="space-y-6">
-          <div className="bg-zinc-900/80 border border-zinc-800/80 p-5 rounded-2xl backdrop-blur-md">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-                <Dumbbell className="w-5 h-5 text-amber-400" />
-                <span>Susunan Gerakan & Target Set</span>
-              </h2>
-              <span className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/20 px-2.5 py-1 rounded-full font-mono">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column: Exercise List + Quick Add */}
+          <div className="lg:col-span-8 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-[#141916] flex items-center gap-2">
+                  <Dumbbell className="w-5 h-5 text-[#C84B11]" />
+                  <span>Susunan Gerakan & Target Set</span>
+                </h2>
+                <p className="text-sm text-[#48524C] mt-0.5">
+                  Atur jumlah set dan tambahkan catatan teknik sebelum memulai sesi aktif.
+                </p>
+              </div>
+              <span className="text-xs font-mono tabular-nums font-semibold text-[#C84B11] bg-[#FFF1EA] border border-[#F4C4AC] px-3 py-1 rounded-lg shrink-0">
                 {activeExercises.length} Gerakan
               </span>
             </div>
-            <p className="text-xs text-zinc-400">
-              Sesuaikan target set dan tambahkan catatan teknik (tempo, posisi bangku, fokus regangan) sebelum mulai memompa otot.
-            </p>
-          </div>
 
-          <div className="space-y-3.5">
-            {activeExercises.map((exercise, idx) => (
-              <div
-                key={exercise.id}
-                className="p-5 bg-zinc-900/60 border border-zinc-800 rounded-2xl transition-all hover:border-zinc-700 shadow-sm"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <span className="w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-300">
-                        {idx + 1}
-                      </span>
-                      <h3 className="font-semibold text-base text-white">{exercise.name}</h3>
-                    </div>
+            {activeExercises.length === 0 ? (
+              <div className="p-8 bg-white border border-[#DCE1D8] rounded-2xl text-center">
+                <p className="text-sm font-semibold text-[#141916]">
+                  Daftar gerakan kosong
+                </p>
+                <p className="text-xs text-[#48524C] mt-1">
+                  Tambahkan minimal satu variasi gerakan di bawah untuk memulai latihan.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {activeExercises.map((exercise, idx) => (
+                  <div
+                    key={exercise.id}
+                    className="p-4 sm:p-5 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs hover:border-[#C5CCC0] transition-colors"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 mb-2.5">
+                          <span className="w-7 h-7 rounded-lg bg-[#ECEFE9] border border-[#DCE1D8] flex items-center justify-center text-xs font-bold font-mono tabular-nums text-[#141916] shrink-0">
+                            {idx + 1}
+                          </span>
+                          <h3 className="font-semibold text-base text-[#141916] truncate">
+                            {exercise.name}
+                          </h3>
+                        </div>
 
-                    {/* Exercise-level hypertrophy cues note */}
-                    <input
-                      type="text"
-                      placeholder="Catatan form/tempo: misal 'Tempo 3-0-1, bangku kemiringan 30°'..."
-                      value={exercise.notes || ""}
-                      onChange={(e) => updateExerciseNotes(exercise.id, e.target.value)}
-                      className="w-full text-xs bg-zinc-950/70 border border-zinc-800/80 rounded-lg px-3 py-1.5 text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-amber-500/50 mt-1"
-                    />
-                  </div>
+                        <input
+                          type="text"
+                          aria-label={`Catatan teknik untuk ${exercise.name}`}
+                          placeholder="Catatan form/tempo (misal: Tempo 3-0-1, kemiringan bangku 30°)"
+                          value={exercise.notes || ""}
+                          onChange={(e) =>
+                            updateExerciseNotes(exercise.id, e.target.value)
+                          }
+                          className="w-full h-10 text-sm bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl px-3.5 text-[#141916] placeholder:text-[#626E67] focus:bg-white focus:border-[#C84B11] outline-none transition-colors"
+                        />
+                      </div>
 
-                  <div className="flex items-center space-x-4 self-end md:self-auto">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-zinc-400 font-medium">Target:</span>
-                      <div className="flex items-center border border-zinc-700 rounded-xl bg-zinc-950 overflow-hidden">
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-[#48524C]">
+                            Target Set
+                          </span>
+                          <div className="flex items-center border border-[#C5CCC0] rounded-xl bg-white overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                ubahTargetSet(
+                                  exercise.id,
+                                  (exercise.targetSets || 3) - 1
+                                )
+                              }
+                              className="w-10 h-10 flex items-center justify-center text-[#48524C] hover:text-[#141916] hover:bg-[#ECEFE9] transition-colors cursor-pointer"
+                              aria-label={`Kurangi target set ${exercise.name}`}
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <span className="px-3 text-sm font-bold text-[#141916] font-mono tabular-nums min-w-[3.5rem] text-center">
+                              {exercise.targetSets || 3}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                ubahTargetSet(
+                                  exercise.id,
+                                  (exercise.targetSets || 3) + 1
+                                )
+                              }
+                              className="w-10 h-10 flex items-center justify-center text-[#48524C] hover:text-[#141916] hover:bg-[#ECEFE9] transition-colors cursor-pointer"
+                              aria-label={`Tambah target set ${exercise.name}`}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
                         <button
-                          onClick={() => ubahTargetSet(exercise.id, (exercise.targetSets || 3) - 1)}
-                          className="px-2.5 py-1 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm"
+                          type="button"
+                          onClick={() => hapusGerakan(exercise.id)}
+                          className="w-10 h-10 flex items-center justify-center text-[#626E67] hover:text-[#BE123C] hover:bg-[#FFF1F2] border border-transparent hover:border-[#FECDD3] rounded-xl transition-colors cursor-pointer"
+                          aria-label={`Hapus ${exercise.name}`}
+                          title="Hapus Gerakan"
                         >
-                          -
-                        </button>
-                        <span className="px-3 py-1 text-xs font-bold text-amber-400 font-mono">
-                          {exercise.targetSets || 3} Set
-                        </span>
-                        <button
-                          onClick={() => ubahTargetSet(exercise.id, (exercise.targetSets || 3) + 1)}
-                          className="px-2.5 py-1 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm"
-                        >
-                          +
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
-
-                    <button
-                      onClick={() => hapusGerakan(exercise.id)}
-                      className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-950/30 rounded-lg transition-colors"
-                      title="Hapus Gerakan"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
+
+            {/* Quick add custom exercise */}
+            <div className="flex flex-col sm:flex-row gap-2.5 p-3 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
+              <input
+                type="text"
+                aria-label="Nama variasi gerakan baru"
+                placeholder="Tambah variasi gerakan baru (misal: Cable Lateral Raise)..."
+                value={namaGerakanBaru}
+                onChange={(e) => setNamaGerakanBaru(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleTambahGerakan()}
+                className="flex-1 h-11 px-3.5 bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl text-sm text-[#141916] outline-none focus:bg-white focus:border-[#C84B11] placeholder:text-[#626E67]"
+              />
+              <button
+                type="button"
+                onClick={handleTambahGerakan}
+                disabled={isAddingExercise || !namaGerakanBaru.trim()}
+                className="h-11 px-5 bg-[#141916] hover:bg-[#48524C] disabled:opacity-40 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{isAddingExercise ? "Menambahkan..." : "Tambah Gerakan"}</span>
+              </button>
+            </div>
           </div>
 
-          {/* Quick add custom exercise */}
-          <div className="flex space-x-2 p-1.5 bg-zinc-900/60 border border-zinc-800 rounded-2xl">
-            <input
-              type="text"
-              placeholder="Tambah variasi gerakan baru (misal: Cable Lateral Raise)..."
-              value={namaGerakanBaru}
-              onChange={(e) => setNamaGerakanBaru(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleTambahGerakan()}
-              className="flex-1 px-4 py-2.5 bg-transparent text-sm text-white outline-none placeholder:text-zinc-500"
-            />
+          {/* Right Column: Session Summary & Primary Start CTA */}
+          <aside className="lg:col-span-4 lg:sticky lg:top-24 bg-white border border-[#DCE1D8] rounded-2xl p-6 shadow-xs space-y-5">
+            <div>
+              <h3 className="text-base font-bold text-[#141916]">
+                Ringkasan Sesi
+              </h3>
+              <p className="text-xs text-[#626E67] mt-0.5">
+                Siap dieksekusi untuk split {initialCategory.name}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3.5 bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl">
+                <span className="text-xs text-[#626E67] block">
+                  Total Gerakan
+                </span>
+                <span className="text-2xl font-bold font-mono tabular-nums text-[#141916] mt-0.5 block">
+                  {activeExercises.length}
+                </span>
+              </div>
+              <div className="p-3.5 bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl">
+                <span className="text-xs text-[#626E67] block">
+                  Total Target Set
+                </span>
+                <span className="text-2xl font-bold font-mono tabular-nums text-[#C84B11] mt-0.5 block">
+                  {totalPlannedSets}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-[#FFF1EA] border border-[#F4C4AC] rounded-xl text-xs text-[#48524C] leading-relaxed">
+              <strong className="text-[#C84B11] font-semibold block mb-0.5">
+                Panduan Eksekusi (1–2 RIR)
+              </strong>
+              Sisakan 1 hingga 2 repetisi sebelum gagal otot di setiap set kerja untuk stimulus hipertrofi optimal tanpa kelelahan berlebih.
+            </div>
+
             <button
-              onClick={handleTambahGerakan}
-              disabled={isAddingExercise || !namaGerakanBaru.trim()}
-              className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-white font-medium rounded-xl text-xs flex items-center space-x-1.5 transition-colors"
+              type="button"
+              onClick={() => {
+                if (activeExercises.length === 0) {
+                  showToast(
+                    "Pilih minimal 1 gerakan sebelum memulai latihan.",
+                    "warning"
+                  );
+                  return;
+                }
+                setCurrentIndex(0);
+                setIsTracking(true);
+              }}
+              className="w-full h-12 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-bold rounded-xl transition-colors text-sm flex items-center justify-center gap-2 cursor-pointer shadow-xs"
             >
-              <Plus className="w-4 h-4" />
-              <span>{isAddingExercise ? "Menambahkan..." : "Tambah"}</span>
+              <Flame className="w-4 h-4" />
+              <span>Mulai Sesi Latihan</span>
+              <ChevronRight className="w-4 h-4" />
             </button>
-          </div>
-
-          {/* Start tracking CTA button */}
-          <button
-            onClick={() => {
-              if (activeExercises.length === 0) {
-                showToast("Pilih minimal 1 gerakan sebelum memulai latihan.");
-                return;
-              }
-              setIsTracking(true);
-            }}
-            className="w-full py-4 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:opacity-95 text-zinc-950 font-black rounded-2xl transition-all shadow-xl shadow-amber-500/20 text-base flex items-center justify-center space-x-2 group cursor-pointer"
-          >
-            <Flame className="w-5 h-5 fill-zinc-950 group-hover:scale-110 transition-transform" />
-            <span>MULAI SESI HIPERTROFI SEKARANG</span>
-            <ChevronRight className="w-5 h-5" />
-          </button>
+          </aside>
         </div>
       ) : (
         /* ========================================================================= */
         /* FASE 2: MODE TRACKER EKSEKUSI DI GYM                                     */
         /* ========================================================================= */
-        <div className="space-y-6">
-          {/* Header Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-zinc-900/90 border border-zinc-800 rounded-2xl backdrop-blur-md">
-            <div className="flex items-center space-x-3">
-              <span className="p-2 bg-amber-500/10 rounded-xl text-amber-400">
-                <Flame className="w-5 h-5" />
-              </span>
-              <div>
-                <span className="text-xs uppercase font-mono tracking-widest text-zinc-500">Live Session</span>
-                <div className="text-sm font-bold text-white flex items-center space-x-2">
-                  <span>{initialCategory.name} Day</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 font-mono">
-                    ⏱ {formatTime(workoutSeconds)}
-                  </span>
+        <div className="space-y-5">
+          {/* Sticky Live Session Bar */}
+          <div className="sticky top-16 md:top-[68px] z-30 bg-white border border-[#DCE1D8] rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#FFF1EA] border border-[#F4C4AC] text-[#C84B11] flex items-center justify-center shrink-0">
+                  <Flame className="w-5 h-5" />
                 </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-[#141916]">
+                      {initialCategory.name} Session
+                    </span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-lg bg-[#ECEFE9] text-[#141916] font-mono tabular-nums font-semibold">
+                      {formatTime(workoutSeconds)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-[#48524C] font-mono tabular-nums mt-0.5">
+                    {totalCompletedSets}/{totalPlannedSets} Set • Volume:{" "}
+                    <strong className="text-[#141916]">
+                      {totalVolumeKg.toLocaleString()} kg
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => startRestTimer(120)}
+                  className="h-10 px-3 bg-[#FFF1EA] hover:bg-[#F4C4AC]/40 border border-[#F4C4AC] text-[#C84B11] rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Timer Rest (2m)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSummaryOpen(true)}
+                  className="h-10 px-4 bg-[#047857] hover:bg-[#065F46] text-white font-semibold rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>
+                    Selesai & Simpan ({totalCompletedSets}/{totalPlannedSets})
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsTracking(false)}
+                  className="h-10 px-3 bg-[#ECEFE9] hover:bg-[#DCE1D8] text-[#48524C] hover:text-[#141916] rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  title="Kembali ubah susunan gerakan"
+                >
+                  Susunan
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setIsSummaryOpen(true)}
-                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-zinc-950 font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow-md shadow-emerald-500/20"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Selesaikan & Catat ({totalCompletedSets}/{totalPlannedSets})</span>
-              </button>
-              <button
-                onClick={() => setIsTracking(false)}
-                className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-xl text-xs transition-colors"
-                title="Batal atau ubah daftar gerakan"
-              >
-                Batal
-              </button>
+            {/* Linear Progress Bar */}
+            <div className="w-full h-1.5 bg-[#ECEFE9] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#047857] transition-all duration-300"
+                style={{ width: `${progressPct}%` }}
+              />
             </div>
           </div>
 
-          {/* Exercise Card */}
-          {activeExercises.length > 0 && currentExercise ? (
-            <div className="bg-zinc-900/90 border border-zinc-800/90 rounded-3xl p-6 shadow-xl backdrop-blur-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-zinc-800 gap-2 mb-5">
-                <div>
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-xs font-mono font-bold text-amber-400 bg-amber-400/10 px-2.5 py-0.5 rounded-full">
-                      GERAKAN {currentIndex + 1} DARI {activeExercises.length}
-                    </span>
-                    <span className="text-xs text-zinc-500">• Hypertrophy Focus</span>
-                  </div>
-                  <h3 className="text-2xl font-black text-white tracking-tight">
-                    {currentExercise.name}
-                  </h3>
-                </div>
+          {/* Exercise Quick-Switch Rail */}
+          {activeExercises.length > 1 && (
+            <div
+              className="flex items-center gap-2 overflow-x-auto pb-1"
+              role="tablist"
+              aria-label="Daftar gerakan sesi"
+            >
+              {activeExercises.map((ex, i) => {
+                const doneCount =
+                  ex.setsData?.filter((s) => s.isCompleted).length || 0;
+                const target = ex.targetSets || 3;
+                const isDoneAll = doneCount >= target && target > 0;
+                const isActive = i === currentIndex;
 
-                <div className="flex items-center space-x-2">
+                return (
                   <button
-                    onClick={() => startRestTimer(120)}
-                    className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-amber-400 rounded-xl text-xs font-medium flex items-center space-x-1 transition-colors"
+                    key={ex.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setCurrentIndex(i)}
+                    className={`px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-[#141916] text-white border-[#141916]"
+                        : isDoneAll
+                        ? "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0] hover:border-[#047857]"
+                        : "bg-white text-[#48524C] border-[#DCE1D8] hover:border-[#C5CCC0] hover:text-[#141916]"
+                    }`}
                   >
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Mulai Timer Rest (2m)</span>
+                    <span className="truncate max-w-[160px]">{ex.name}</span>
+                    <span
+                      className={`font-mono tabular-nums px-1.5 py-0.5 rounded-md ${
+                        isActive
+                          ? "bg-white/15 text-white"
+                          : isDoneAll
+                          ? "bg-white text-[#047857]"
+                          : "bg-[#ECEFE9] text-[#48524C]"
+                      }`}
+                    >
+                      {doneCount}/{target}
+                    </span>
                   </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Active Exercise Logging Card */}
+          {activeExercises.length > 0 && currentExercise ? (
+            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 sm:p-6 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#DCE1D8] gap-3 mb-5">
+                <div>
+                  <span className="inline-block text-xs font-mono tabular-nums font-semibold text-[#C84B11] bg-[#FFF1EA] border border-[#F4C4AC] px-2.5 py-0.5 rounded-lg mb-2">
+                    Gerakan {currentIndex + 1} dari {activeExercises.length}
+                  </span>
+                  <h2 className="text-2xl font-bold text-[#141916] tracking-tight">
+                    {currentExercise.name}
+                  </h2>
                 </div>
               </div>
 
-              {/* Form & Hypertrophy Cue Note */}
-              <div className="p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800/80 mb-6">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-zinc-400 flex items-center space-x-1.5">
-                    <StickyNote className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Catatan Bentuk & Posisi:</span>
-                  </span>
-                </div>
+              {/* Exercise Cue Note */}
+              <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] mb-6">
+                <label
+                  htmlFor={`exercise-note-${currentExercise.id}`}
+                  className="text-xs font-semibold text-[#48524C] flex items-center gap-1.5 mb-1.5"
+                >
+                  <StickyNote className="w-3.5 h-3.5 text-[#C84B11]" />
+                  <span>Catatan Bentuk & Posisi</span>
+                </label>
                 <input
+                  id={`exercise-note-${currentExercise.id}`}
                   type="text"
-                  placeholder="Ketik catatan gerakan (misal: 'Sudut bangku #3, regangan penuh di bawah')..."
+                  placeholder="Ketik catatan gerakan (misal: Sudut bangku #3, regangan penuh di bawah)..."
                   value={currentExercise.notes || ""}
-                  onChange={(e) => updateExerciseNotes(currentExercise.id, e.target.value)}
-                  className="w-full text-xs bg-transparent text-zinc-300 placeholder:text-zinc-600 outline-none"
+                  onChange={(e) =>
+                    updateExerciseNotes(currentExercise.id, e.target.value)
+                  }
+                  className="w-full text-sm bg-white border border-[#DCE1D8] focus:border-[#C84B11] rounded-lg px-3 py-2 text-[#141916] placeholder:text-[#626E67] outline-none"
                 />
               </div>
 
               {/* Sets Table */}
               <div className="space-y-3 mb-6">
-                <div className="grid grid-cols-12 gap-2 text-[11px] font-bold text-zinc-400 px-2 uppercase tracking-wider">
-                  <span className="col-span-1 text-center">SET</span>
-                  <span className="col-span-3 text-center">BEBAN (KG)</span>
-                  <span className="col-span-3 text-center">REPETISI</span>
-                  <span className="col-span-3 text-center" title="Reps In Reserve: Berapa repetisi sebelum gagal otot?">
-                    RIR <Info className="inline w-3 h-3 text-zinc-500" />
+                {/* Desktop Column Headers */}
+                <div className="hidden sm:grid sm:grid-cols-12 gap-3 text-xs font-semibold text-[#626E67] px-3 uppercase tracking-wider">
+                  <span className="col-span-1 text-center">Set</span>
+                  <span className="col-span-3 text-center">Beban (kg)</span>
+                  <span className="col-span-3 text-center">Repetisi</span>
+                  <span
+                    className="col-span-3 text-center flex items-center justify-center gap-1"
+                    title="Reps In Reserve: sisa repetisi sebelum gagal otot"
+                  >
+                    <span>RIR</span>
+                    <Info className="w-3.5 h-3.5 text-[#626E67]" />
                   </span>
-                  <span className="col-span-2 text-center">STATUS</span>
+                  <span className="col-span-2 text-center">Status</span>
                 </div>
 
-                {Array.from({ length: currentExercise.targetSets || 3 }).map((_, setIndex) => {
-                  const setItem = currentExercise.setsData?.[setIndex] || {
-                    weight: "",
-                    reps: "",
-                    rir: 1,
-                    notes: "",
-                    isCompleted: false,
-                  };
+                {Array.from({ length: currentExercise.targetSets || 3 }).map(
+                  (_, setIndex) => {
+                    const setItem = currentExercise.setsData?.[setIndex] || {
+                      weight: "",
+                      reps: "",
+                      rir: 1,
+                      notes: "",
+                      isCompleted: false,
+                    };
 
-                  const isLocked = setItem.isCompleted;
-                  const isPreviousNotDone =
-                    setIndex > 0 && !currentExercise.setsData?.[setIndex - 1]?.isCompleted;
-                  const isDisabled = isLocked || isPreviousNotDone;
+                    const isLocked = setItem.isCompleted;
+                    const isPreviousNotDone =
+                      setIndex > 0 &&
+                      !currentExercise.setsData?.[setIndex - 1]?.isCompleted;
+                    const isDisabled = isLocked || isPreviousNotDone;
 
-                  return (
-                    <div
-                      key={setIndex}
-                      className={`grid grid-cols-12 gap-2 items-center p-3 rounded-2xl border transition-all ${
-                        isLocked
-                          ? "bg-zinc-950/40 border-emerald-500/30"
-                          : "bg-zinc-950 border-zinc-800 hover:border-zinc-700"
-                      }`}
-                    >
-                      {/* Set Number */}
-                      <div className="col-span-1 text-center">
-                        <span
-                          className={`w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold font-mono ${
-                            isLocked ? "bg-emerald-500/20 text-emerald-400" : "text-zinc-400"
-                          }`}
-                        >
-                          {setIndex + 1}
-                        </span>
-                      </div>
+                    return (
+                      <div
+                        key={setIndex}
+                        className={`p-3.5 rounded-2xl border transition-colors ${
+                          isLocked
+                            ? "bg-[#ECFDF5] border-[#A7F3D0]"
+                            : isPreviousNotDone
+                            ? "bg-[#F5F6F3] border-[#DCE1D8] opacity-75"
+                            : "bg-white border-[#DCE1D8] hover:border-[#C5CCC0]"
+                        }`}
+                      >
+                        {/* Desktop 12-col row */}
+                        <div className="hidden sm:grid sm:grid-cols-12 gap-3 items-center">
+                          <div className="col-span-1 text-center">
+                            <span
+                              className={`w-8 h-8 rounded-lg inline-flex items-center justify-center text-xs font-bold font-mono tabular-nums ${
+                                isLocked
+                                  ? "bg-[#047857] text-white"
+                                  : "bg-[#ECEFE9] text-[#141916]"
+                              }`}
+                            >
+                              {setIndex + 1}
+                            </span>
+                          </div>
 
-                      {/* Weight (KG) */}
-                      <div className="col-span-3">
-                        <div className="relative">
-                          <input
-                            type="number"
-                            step="0.5"
-                            placeholder="0"
-                            value={setItem.weight}
-                            onChange={(e) =>
-                              updateSetField(currentExercise.id, setIndex, "weight", e.target.value)
-                            }
-                            disabled={isDisabled}
-                            className={`w-full py-2.5 px-2 text-center rounded-xl font-mono text-sm outline-none transition-colors ${
-                              isDisabled
-                                ? "bg-zinc-900/40 text-zinc-500 cursor-not-allowed"
-                                : "bg-zinc-900 border border-zinc-700/80 text-white focus:border-amber-400"
-                            }`}
-                          />
+                          <div className="col-span-3">
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              aria-label={`Beban kg untuk set ${setIndex + 1}`}
+                              placeholder="0"
+                              value={setItem.weight}
+                              onChange={(e) =>
+                                updateSetField(
+                                  currentExercise.id,
+                                  setIndex,
+                                  "weight",
+                                  e.target.value
+                                )
+                              }
+                              disabled={isDisabled}
+                              className={`w-full h-11 px-2 text-center rounded-xl font-mono tabular-nums text-base font-semibold outline-none transition-colors ${
+                                isDisabled
+                                  ? "bg-[#ECEFE9] border border-[#DCE1D8] text-[#626E67] cursor-not-allowed"
+                                  : "bg-white border border-[#C5CCC0] text-[#141916] focus:border-[#C84B11]"
+                              }`}
+                            />
+                          </div>
+
+                          <div className="col-span-3">
+                            <input
+                              type="number"
+                              min="0"
+                              aria-label={`Repetisi untuk set ${setIndex + 1}`}
+                              placeholder="0"
+                              value={setItem.reps}
+                              onChange={(e) =>
+                                updateSetField(
+                                  currentExercise.id,
+                                  setIndex,
+                                  "reps",
+                                  e.target.value
+                                )
+                              }
+                              disabled={isDisabled}
+                              className={`w-full h-11 px-2 text-center rounded-xl font-mono tabular-nums text-base font-semibold outline-none transition-colors ${
+                                isDisabled
+                                  ? "bg-[#ECEFE9] border border-[#DCE1D8] text-[#626E67] cursor-not-allowed"
+                                  : "bg-white border border-[#C5CCC0] text-[#141916] focus:border-[#C84B11]"
+                              }`}
+                            />
+                          </div>
+
+                          <div className="col-span-3">
+                            <select
+                              aria-label={`RIR untuk set ${setIndex + 1}`}
+                              value={setItem.rir ?? 1}
+                              onChange={(e) =>
+                                updateSetField(
+                                  currentExercise.id,
+                                  setIndex,
+                                  "rir",
+                                  parseInt(e.target.value, 10)
+                                )
+                              }
+                              disabled={isDisabled}
+                              className={`w-full h-11 px-2 text-center rounded-xl font-mono tabular-nums text-xs font-semibold outline-none transition-colors ${
+                                isDisabled
+                                  ? "bg-[#ECEFE9] border border-[#DCE1D8] text-[#626E67] cursor-not-allowed"
+                                  : "bg-white border border-[#C5CCC0] text-[#141916] focus:border-[#C84B11]"
+                              }`}
+                            >
+                              <option value={0}>0 (Failure)</option>
+                              <option value={1}>1 (Sangat Keras)</option>
+                              <option value={2}>2 (Optimal)</option>
+                              <option value={3}>3 (Sedang)</option>
+                              <option value={4}>4+ (Pemanasan)</option>
+                            </select>
+                          </div>
+
+                          <div className="col-span-2 flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveSetNoteModal({
+                                  exerciseIndex: currentIndex,
+                                  setIndex,
+                                });
+                                setTempNoteText(setItem.notes || "");
+                              }}
+                              className={`w-10 h-11 rounded-xl flex items-center justify-center border transition-colors cursor-pointer ${
+                                setItem.notes
+                                  ? "text-[#C84B11] bg-[#FFF1EA] border-[#F4C4AC]"
+                                  : "text-[#626E67] bg-white border-[#DCE1D8] hover:text-[#141916] hover:border-[#C5CCC0]"
+                              }`}
+                              aria-label={`Catatan set ${setIndex + 1}`}
+                              title="Tambah Catatan Set"
+                            >
+                              <StickyNote className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleSetCompleted(currentExercise.id, setIndex)
+                              }
+                              className={`flex-1 h-11 px-3 rounded-xl text-xs font-bold transition-colors flex items-center justify-center cursor-pointer ${
+                                isLocked
+                                  ? "bg-[#047857] hover:bg-[#065F46] text-white"
+                                  : "bg-[#141916] hover:bg-[#C84B11] text-white"
+                              }`}
+                              aria-label={
+                                isLocked
+                                  ? `Batalkan selesai set ${setIndex + 1}`
+                                  : `Catat selesai set ${setIndex + 1}`
+                              }
+                            >
+                              {isLocked ? "Selesai" : "Catat"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Mobile 2-row card */}
+                        <div className="sm:hidden space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`w-7 h-7 rounded-lg inline-flex items-center justify-center text-xs font-bold font-mono tabular-nums ${
+                                  isLocked
+                                    ? "bg-[#047857] text-white"
+                                    : "bg-[#ECEFE9] text-[#141916]"
+                                }`}
+                              >
+                                {setIndex + 1}
+                              </span>
+                              <span className="text-sm font-semibold text-[#141916]">
+                                Set {setIndex + 1}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveSetNoteModal({
+                                    exerciseIndex: currentIndex,
+                                    setIndex,
+                                  });
+                                  setTempNoteText(setItem.notes || "");
+                                }}
+                                className={`w-10 h-10 rounded-xl flex items-center justify-center border cursor-pointer ${
+                                  setItem.notes
+                                    ? "text-[#C84B11] bg-[#FFF1EA] border-[#F4C4AC]"
+                                    : "text-[#626E67] bg-white border-[#DCE1D8]"
+                                }`}
+                                aria-label={`Catatan set ${setIndex + 1}`}
+                              >
+                                <StickyNote className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  toggleSetCompleted(
+                                    currentExercise.id,
+                                    setIndex
+                                  )
+                                }
+                                className={`h-10 px-4 rounded-xl text-xs font-bold cursor-pointer ${
+                                  isLocked
+                                    ? "bg-[#047857] text-white"
+                                    : "bg-[#141916] text-white"
+                                }`}
+                              >
+                                {isLocked ? "Selesai" : "Catat"}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-xs font-medium text-[#626E67] mb-1">
+                                Beban (kg)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                placeholder="0"
+                                value={setItem.weight}
+                                onChange={(e) =>
+                                  updateSetField(
+                                    currentExercise.id,
+                                    setIndex,
+                                    "weight",
+                                    e.target.value
+                                  )
+                                }
+                                disabled={isDisabled}
+                                className={`w-full h-11 px-2 text-center rounded-xl font-mono tabular-nums text-base font-semibold outline-none ${
+                                  isDisabled
+                                    ? "bg-[#ECEFE9] border border-[#DCE1D8] text-[#626E67]"
+                                    : "bg-white border border-[#C5CCC0] text-[#141916] focus:border-[#C84B11]"
+                                }`}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-[#626E67] mb-1">
+                                Repetisi
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={setItem.reps}
+                                onChange={(e) =>
+                                  updateSetField(
+                                    currentExercise.id,
+                                    setIndex,
+                                    "reps",
+                                    e.target.value
+                                  )
+                                }
+                                disabled={isDisabled}
+                                className={`w-full h-11 px-2 text-center rounded-xl font-mono tabular-nums text-base font-semibold outline-none ${
+                                  isDisabled
+                                    ? "bg-[#ECEFE9] border border-[#DCE1D8] text-[#626E67]"
+                                    : "bg-white border border-[#C5CCC0] text-[#141916] focus:border-[#C84B11]"
+                                }`}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-[#626E67] mb-1">
+                                RIR
+                              </label>
+                              <select
+                                value={setItem.rir ?? 1}
+                                onChange={(e) =>
+                                  updateSetField(
+                                    currentExercise.id,
+                                    setIndex,
+                                    "rir",
+                                    parseInt(e.target.value, 10)
+                                  )
+                                }
+                                disabled={isDisabled}
+                                className={`w-full h-11 px-1.5 text-center rounded-xl font-mono tabular-nums text-xs font-semibold outline-none ${
+                                  isDisabled
+                                    ? "bg-[#ECEFE9] border border-[#DCE1D8] text-[#626E67]"
+                                    : "bg-white border border-[#C5CCC0] text-[#141916] focus:border-[#C84B11]"
+                                }`}
+                              >
+                                <option value={0}>0 (Fail)</option>
+                                <option value={1}>1</option>
+                                <option value={2}>2</option>
+                                <option value={3}>3</option>
+                                <option value={4}>4+</option>
+                              </select>
+                            </div>
+                          </div>
                         </div>
                       </div>
-
-                      {/* Reps */}
-                      <div className="col-span-3">
-                        <input
-                          type="number"
-                          placeholder="0"
-                          value={setItem.reps}
-                          onChange={(e) =>
-                            updateSetField(currentExercise.id, setIndex, "reps", e.target.value)
-                          }
-                          disabled={isDisabled}
-                          className={`w-full py-2.5 px-2 text-center rounded-xl font-mono text-sm outline-none transition-colors ${
-                            isDisabled
-                              ? "bg-zinc-900/40 text-zinc-500 cursor-not-allowed"
-                              : "bg-zinc-900 border border-zinc-700/80 text-white focus:border-amber-400"
-                          }`}
-                        />
-                      </div>
-
-                      {/* RIR (Reps in Reserve: 0 = Failure, 1 = 1 left, 2 = 2 left) */}
-                      <div className="col-span-3">
-                        <select
-                          value={setItem.rir ?? 1}
-                          onChange={(e) =>
-                            updateSetField(currentExercise.id, setIndex, "rir", parseInt(e.target.value))
-                          }
-                          disabled={isDisabled}
-                          className={`w-full py-2.5 px-1.5 text-center rounded-xl font-mono text-xs outline-none transition-colors ${
-                            isDisabled
-                              ? "bg-zinc-900/40 text-zinc-500 cursor-not-allowed"
-                              : "bg-zinc-900 border border-zinc-700/80 text-amber-400 font-semibold focus:border-amber-400"
-                          }`}
-                        >
-                          <option value={0}>0 (Failure 🔥)</option>
-                          <option value={1}>1 (Sangat Keras)</option>
-                          <option value={2}>2 (Optimal)</option>
-                          <option value={3}>3 (Sedang)</option>
-                          <option value={4}>4+ (Pemanasan)</option>
-                        </select>
-                      </div>
-
-                      {/* Check Button & Note Icon */}
-                      <div className="col-span-2 flex items-center justify-center space-x-1.5">
-                        <button
-                          onClick={() => {
-                            setActiveSetNoteModal({ exerciseIndex: currentIndex, setIndex });
-                            setTempNoteText(setItem.notes || "");
-                          }}
-                          className={`p-2 rounded-xl transition-colors ${
-                            setItem.notes ? "text-amber-400 bg-amber-400/10" : "text-zinc-600 hover:text-zinc-400"
-                          }`}
-                          title="Tambah Catatan Set"
-                        >
-                          <StickyNote className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          onClick={() => toggleSetCompleted(currentExercise.id, setIndex)}
-                          className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center ${
-                            isLocked
-                              ? "bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-md shadow-emerald-500/20"
-                              : "bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white"
-                          }`}
-                        >
-                          {isLocked ? "✓" : "Log"}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  }
+                )}
               </div>
 
               {/* Prev / Next Exercise Pagination */}
-              <div className="flex items-center justify-between pt-4 border-t border-zinc-800">
+              <div className="flex items-center justify-between gap-2 pt-4 border-t border-[#DCE1D8]">
                 <button
+                  type="button"
                   onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
                   disabled={currentIndex === 0}
-                  className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 text-zinc-300 font-semibold rounded-xl text-xs flex items-center space-x-1 transition-colors"
+                  className="h-10 px-4 bg-[#ECEFE9] hover:bg-[#DCE1D8] disabled:opacity-40 text-[#141916] font-semibold rounded-xl text-xs sm:text-sm flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
-                  <span>Gerakan Sebelumnya</span>
+                  <span>Sebelumnya</span>
                 </button>
 
-                <div className="flex space-x-1.5">
-                  {activeExercises.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentIndex(i)}
-                      className={`w-2.5 h-2.5 rounded-full transition-all ${
-                        i === currentIndex ? "w-6 bg-amber-400" : "bg-zinc-700"
-                      }`}
-                    />
-                  ))}
-                </div>
+                <span className="text-xs font-mono tabular-nums font-semibold text-[#626E67]">
+                  {currentIndex + 1} / {activeExercises.length}
+                </span>
 
                 <button
-                  onClick={() => setCurrentIndex((prev) => Math.min(activeExercises.length - 1, prev + 1))}
+                  type="button"
+                  onClick={() =>
+                    setCurrentIndex((prev) =>
+                      Math.min(activeExercises.length - 1, prev + 1)
+                    )
+                  }
                   disabled={currentIndex === activeExercises.length - 1}
-                  className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-30 text-zinc-300 font-semibold rounded-xl text-xs flex items-center space-x-1 transition-colors"
+                  className="h-10 px-4 bg-[#ECEFE9] hover:bg-[#DCE1D8] disabled:opacity-40 text-[#141916] font-semibold rounded-xl text-xs sm:text-sm flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <span>Gerakan Berikutnya</span>
+                  <span>Berikutnya</span>
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
           ) : (
-            <div className="p-8 text-center bg-zinc-900 border border-zinc-800 rounded-3xl">
-              <p className="text-zinc-400">Semua gerakan telah diselesaikan!</p>
+            <div className="p-8 text-center bg-white border border-[#DCE1D8] rounded-2xl">
+              <p className="text-[#48524C] text-sm">
+                Semua gerakan telah diselesaikan.
+              </p>
               <button
+                type="button"
                 onClick={() => setIsSummaryOpen(true)}
-                className="mt-4 px-6 py-3 bg-emerald-500 font-bold text-zinc-950 rounded-xl"
+                className="mt-4 h-11 px-6 bg-[#047857] hover:bg-[#065F46] font-semibold text-white rounded-xl text-sm cursor-pointer"
               >
                 Lihat Ringkasan & Simpan
               </button>

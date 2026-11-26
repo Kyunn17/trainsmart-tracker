@@ -95,6 +95,9 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
+        // Seed Indonesian workout splits & template sessions
+        $this->call(SplitSeeder::class);
+
         // Sample initial log for client Budi
         if (WorkoutLog::where('user_id', $clientBudi->id)->count() === 0) {
             WorkoutLog::create([

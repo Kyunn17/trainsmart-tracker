@@ -6,6 +6,7 @@ use App\Http\Controllers\WorkoutController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\TrainerController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\SplitController;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,6 +25,10 @@ Route::get('/categories/{id}', [WorkoutController::class, 'show']);
 Route::get('/trainers', [ClientController::class, 'trainers']);
 Route::get('/workout-logs', [WorkoutController::class, 'history']);
 Route::post('/workout-logs', [WorkoutController::class, 'storeLogs']);
+
+// --- Split Recommendations & Details ---
+Route::get('/splits/recommendations', [SplitController::class, 'recommendations']);
+Route::get('/splits/{id}', [SplitController::class, 'show'])->whereNumber('id');
 
 // --- 3. Authenticated Routes (Any Role) ---
 Route::middleware('auth:sanctum')->group(function () {

@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WorkoutLog extends Model
 {
     protected $fillable = [
         'user_id',
         'exercise_id',
+        'daily_session_id',
         'set_number',
         'weight',
         'reps',
@@ -17,13 +19,18 @@ class WorkoutLog extends Model
         'notes',
     ];
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function exercise()
+    public function exercise(): BelongsTo
     {
         return $this->belongsTo(Exercise::class);
+    }
+
+    public function dailySession(): BelongsTo
+    {
+        return $this->belongsTo(DailySession::class);
     }
 }

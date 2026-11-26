@@ -1,19 +1,27 @@
 import Link from "next/link";
-import { 
-  Dumbbell, 
-  Flame, 
-  ChevronRight, 
-  Trophy, 
-  Zap, 
-  Activity, 
-  ShieldCheck, 
+import {
+  Dumbbell,
+  Flame,
+  ChevronRight,
+  Zap,
+  ShieldCheck,
   History,
-  Sparkles
+  StickyNote,
 } from "lucide-react";
 import { getCategories, getWorkoutHistory } from "@/lib/api";
-import { Category } from "@/types/workout";
+import { Category, WorkoutLogEntry } from "@/types/workout";
 
 export const dynamic = "force-dynamic";
+
+function getRirBadgeStyle(rir: number | null | undefined) {
+  if (rir === 0) {
+    return "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]";
+  }
+  if (rir === 1 || rir === 2) {
+    return "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]";
+  }
+  return "bg-[#ECEFE9] text-[#48524C] border-[#DCE1D8]";
+}
 
 export default async function Home() {
   const [categories, history] = await Promise.all([
@@ -21,187 +29,251 @@ export default async function Home() {
     getWorkoutHistory(),
   ]);
 
-  const muscleMeta: Record<string, { label: string; badge: string; color: string; desc: string }> = {
+  const muscleMeta: Record<
+    string,
+    {
+      label: string;
+      badge: string;
+      pillClass: string;
+      dotClass: string;
+      desc: string;
+    }
+  > = {
     Push: {
       label: "Push Split",
       badge: "Dada • Bahu • Trisep",
-      color: "from-amber-500/20 to-orange-500/10 border-amber-500/30 text-amber-400",
-      desc: "Menargetkan otot pendorong: Pectoralis major, anterior/lateral deltoid, dan triceps brachii.",
+      pillClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+      dotClass: "bg-[#C84B11]",
+      desc: "Otot pendorong: Pectoralis major, anterior & lateral deltoid, serta triceps brachii.",
     },
     Pull: {
       label: "Pull Split",
       badge: "Punggung • Bisep • Rear Delt",
-      color: "from-blue-500/20 to-cyan-500/10 border-blue-500/30 text-blue-400",
-      desc: "Menargetkan otot penarik: Latissimus dorsi, rhomboids, trapezius, dan biceps brachii.",
+      pillClass: "bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]",
+      dotClass: "bg-[#1D4ED8]",
+      desc: "Otot penarik: Latissimus dorsi, rhomboids, trapezius, dan biceps brachii.",
     },
     Legs: {
       label: "Legs Split",
       badge: "Quads • Hamstrings • Calves",
-      color: "from-emerald-500/20 to-teal-500/10 border-emerald-500/30 text-emerald-400",
-      desc: "Fondasi tubuh bawah: Quadriceps, glutes, hamstrings, dan calves untuk produksi kekuatan maksimal.",
+      pillClass: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
+      dotClass: "bg-[#047857]",
+      desc: "Fondasi tubuh bawah: Quadriceps, glutes, hamstrings, dan calves.",
     },
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white antialiased selection:bg-amber-500 selection:text-black">
-      {/* Background ambient glow */}
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_80%_at_50%_-10%,rgba(245,158,11,0.09),rgba(255,255,255,0))]" />
-
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 relative">
-        {/* HERO SECTION */}
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-zinc-900 border border-amber-500/30 text-amber-400 text-xs font-mono uppercase tracking-widest mb-4 backdrop-blur-md shadow-lg shadow-amber-500/10">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Smart Gym Hypertrophy System</span>
+    <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-10">
+        {/* Operational Page Header */}
+        <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-[#DCE1D8]">
+          <div className="max-w-2xl">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#141916]">
+              Jadwal Latihan Hari Ini
+            </h1>
+            <p className="text-sm sm:text-base text-[#48524C] mt-2 leading-relaxed">
+              Catat beban, repetisi, dan <strong className="font-semibold text-[#141916]">RIR (Reps In Reserve)</strong> secara terstruktur untuk memastikan progressive overload dan hipertrofi otot maksimal.
+            </p>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white mb-4">
-            TRAIN<span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-500">SMART</span>
-          </h1>
-
-          <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-            Catat beban, repetisi, dan <strong className="text-zinc-200">RIR (Reps In Reserve)</strong> secara terstruktur untuk memastikan progressive overload dan hipertrofi otot maksimal.
-          </p>
-
-          {/* Hypertrophy Key Principles Badges */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-6">
-            <span className="px-3 py-1 bg-zinc-900/90 border border-zinc-800 rounded-full text-[11px] text-zinc-300 flex items-center space-x-1.5 font-medium">
-              <Zap className="w-3 h-3 text-amber-400" />
-              <span>1-2 RIR (Near Failure)</span>
+          {/* Compact Operational Principles & Summary Strip */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="px-3.5 py-2 bg-white border border-[#DCE1D8] rounded-xl text-xs font-semibold text-[#141916] flex items-center gap-2 shadow-xs">
+              <Zap className="w-4 h-4 text-[#C84B11]" />
+              <span>Target 1–2 RIR</span>
             </span>
-            <span className="px-3 py-1 bg-zinc-900/90 border border-zinc-800 rounded-full text-[11px] text-zinc-300 flex items-center space-x-1.5 font-medium">
-              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+            <span className="px-3.5 py-2 bg-white border border-[#DCE1D8] rounded-xl text-xs font-semibold text-[#141916] flex items-center gap-2 shadow-xs">
+              <ShieldCheck className="w-4 h-4 text-[#047857]" />
               <span>Full Range of Motion</span>
             </span>
-            <span className="px-3 py-1 bg-zinc-900/90 border border-zinc-800 rounded-full text-[11px] text-zinc-300 flex items-center space-x-1.5 font-medium">
-              <Flame className="w-3 h-3 text-rose-400" />
-              <span>Progressive Overload Log</span>
+            <span className="px-3.5 py-2 bg-[#ECEFE9] border border-[#DCE1D8] rounded-xl text-xs font-semibold text-[#48524C] flex items-center gap-2">
+              <Flame className="w-4 h-4 text-[#C84B11]" />
+              <span className="font-mono tabular-nums">{categories.length}</span> Split •{" "}
+              <span className="font-mono tabular-nums">{history.length}</span> Log
             </span>
           </div>
-        </div>
+        </section>
 
         {/* WORKOUT CATEGORIES SPLITS */}
-        <div className="mb-14">
-          <div className="flex items-center justify-between mb-6">
+        <section aria-labelledby="splits-heading">
+          <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="text-xl font-bold text-white flex items-center space-x-2">
-                <Dumbbell className="w-5 h-5 text-amber-400" />
-                <span>Pilih Jadwal Latihan Hari Ini</span>
+              <h2 id="splits-heading" className="text-xl font-bold text-[#141916] flex items-center gap-2">
+                <Dumbbell className="w-5 h-5 text-[#C84B11]" />
+                <span>Pilih Menu Split Latihan</span>
               </h2>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Pilih menu latihan untuk mengatur target beban, set, dan mulai sesi aktif di gym.
+              <p className="text-sm text-[#48524C] mt-1">
+                Pilih jadwal untuk mengatur target set, catatan teknik, dan mulai mencatat sesi aktif di gym.
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {categories.map((category: Category) => {
-              const meta = muscleMeta[category.name] || {
-                label: `${category.name} Split`,
-                badge: "Otot Target",
-                color: "from-zinc-800/40 to-zinc-900/40 border-zinc-700 text-zinc-300",
-                desc: "Jadwal dan gerakan latihan.",
-              };
+          {categories.length === 0 ? (
+            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-10 text-center shadow-xs">
+              <div className="w-12 h-12 rounded-2xl bg-[#ECEFE9] text-[#48524C] flex items-center justify-center mx-auto mb-4">
+                <Dumbbell className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-[#141916]">
+                Belum Ada Jadwal Latihan Tersedia
+              </h3>
+              <p className="text-sm text-[#48524C] mt-1.5 max-w-md mx-auto">
+                Data kategori latihan belum ditemukan. Pastikan server backend aktif atau tambahkan kategori split terlebih dahulu.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {categories.map((category: Category) => {
+                const meta = muscleMeta[category.name] || {
+                  label: `${category.name} Split`,
+                  badge: "Otot Target",
+                  pillClass: "bg-[#ECEFE9] text-[#48524C] border-[#DCE1D8]",
+                  dotClass: "bg-[#C84B11]",
+                  desc: "Jadwal dan daftar gerakan latihan terstruktur.",
+                };
 
-              return (
-                <Link
-                  href={`/workout/${category.id}`}
-                  key={category.id}
-                  className="group relative flex flex-col justify-between p-6 bg-gradient-to-b from-zinc-900/90 to-zinc-950/90 border border-zinc-800/90 hover:border-amber-500/50 rounded-3xl transition-all duration-300 hover:shadow-2xl hover:shadow-amber-500/10 hover:-translate-y-1 overflow-hidden"
-                >
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className={`text-[11px] font-mono font-bold px-2.5 py-1 rounded-full border bg-zinc-950/80 ${meta.color}`}>
-                        {meta.label}
-                      </span>
-                      <span className="text-xs font-mono text-zinc-500">
-                        {category.exercises.length} Gerakan
-                      </span>
-                    </div>
-
-                    <h3 className="text-2xl font-black text-white mb-1 group-hover:text-amber-400 transition-colors">
-                      {category.name}
-                    </h3>
-                    <p className="text-xs text-zinc-400 mb-4 line-clamp-2">
-                      {meta.desc}
-                    </p>
-
-                    {/* Exercise items list pill preview */}
-                    <div className="space-y-1.5 pt-3 border-t border-zinc-800/80">
-                      {category.exercises.slice(0, 4).map((exercise) => (
-                        <div
-                          key={exercise.id}
-                          className="flex items-center space-x-2 text-xs text-zinc-300"
+                return (
+                  <Link
+                    href={`/workout/${category.id}`}
+                    key={category.id}
+                    className="group flex flex-col justify-between p-6 bg-white border border-[#DCE1D8] hover:border-[#C5CCC0] rounded-2xl shadow-xs hover:shadow-md transition-all"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-4">
+                        <span
+                          className={`text-xs font-semibold px-3 py-1 rounded-lg border ${meta.pillClass}`}
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                          <span className="truncate">{exercise.name}</span>
-                        </div>
-                      ))}
-                      {category.exercises.length > 4 && (
-                        <span className="text-[11px] text-zinc-500 block pt-1">
-                          +{category.exercises.length - 4} gerakan lainnya...
+                          {meta.label}
                         </span>
-                      )}
-                    </div>
-                  </div>
+                        <span className="text-xs font-mono tabular-nums font-semibold text-[#626E67] bg-[#ECEFE9] px-2.5 py-1 rounded-lg">
+                          {category.exercises.length} Gerakan
+                        </span>
+                      </div>
 
-                  <div className="mt-6 pt-4 border-t border-zinc-800/60 flex items-center justify-between text-xs font-bold text-amber-400 group-hover:text-amber-300">
-                    <span>Mulai Latihan</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
+                      <h3 className="text-2xl font-bold text-[#141916] group-hover:text-[#C84B11] transition-colors">
+                        {category.name}
+                      </h3>
+                      <p className="text-xs font-medium text-[#626E67] mt-0.5">
+                        {meta.badge}
+                      </p>
+                      <p className="text-sm text-[#48524C] mt-3 mb-5 leading-relaxed">
+                        {meta.desc}
+                      </p>
+
+                      {/* Exercise items preview */}
+                      <div className="space-y-2 pt-4 border-t border-[#DCE1D8]">
+                        {category.exercises.slice(0, 4).map((exercise) => (
+                          <div
+                            key={exercise.id}
+                            className="flex items-center gap-2.5 text-sm text-[#141916]"
+                          >
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${meta.dotClass}`} />
+                            <span className="truncate">{exercise.name}</span>
+                          </div>
+                        ))}
+                        {category.exercises.length > 4 && (
+                          <span className="text-xs font-medium text-[#626E67] block pt-1">
+                            +{category.exercises.length - 4} gerakan lainnya
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-[#DCE1D8] flex items-center justify-between text-sm font-semibold text-[#C84B11] group-hover:text-[#A83D0B]">
+                      <span>Mulai Latihan</span>
+                      <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {/* RECENT HYPERTROPHY LOGS SECTION */}
-        {history.length > 0 && (
-          <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-3xl backdrop-blur-md">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-white flex items-center space-x-2">
-                <History className="w-4 h-4 text-amber-400" />
+        <section aria-labelledby="recent-logs-heading">
+          <div className="bg-white border border-[#DCE1D8] rounded-2xl overflow-hidden shadow-xs">
+            <div className="px-6 py-4 bg-[#ECEFE9]/60 border-b border-[#DCE1D8] flex flex-wrap items-center justify-between gap-2">
+              <h2
+                id="recent-logs-heading"
+                className="text-base font-bold text-[#141916] flex items-center gap-2"
+              >
+                <History className="w-4 h-4 text-[#C84B11]" />
                 <span>Riwayat Catatan Hipertrofi Terakhir</span>
-              </h3>
-              <span className="text-xs text-zinc-500 font-mono">
+              </h2>
+              <span className="text-xs font-mono tabular-nums font-semibold text-[#48524C] bg-white border border-[#DCE1D8] px-3 py-1 rounded-lg">
                 {history.length} Catatan Masuk
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {history.slice(0, 6).map((log: any) => (
-                <div
-                  key={log.id}
-                  className="p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800/80 text-xs"
-                >
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="font-semibold text-white truncate max-w-[150px]">
-                      {log.exercise?.name || `Gerakan #${log.exercise_id}`}
-                    </span>
-                    <span className="text-[10px] font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
-                      Set {log.set_number}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-zinc-400 mt-2">
-                    <span>
-                      <strong className="text-white text-sm">{log.weight}</strong> kg × <strong className="text-white text-sm">{log.reps}</strong> reps
-                    </span>
-                    {log.rir !== null && (
-                      <span className="text-[11px] font-mono text-zinc-300">
-                        RIR: <strong>{log.rir}</strong>
-                      </span>
-                    )}
-                  </div>
-                  {log.notes && (
-                    <p className="text-[11px] text-zinc-400 italic mt-1.5 truncate">
-                      "{log.notes}"
-                    </p>
-                  )}
+            {history.length === 0 ? (
+              <div className="p-8 text-center text-sm text-[#48524C]">
+                Belum ada catatan set yang masuk. Pilih salah satu split latihan di atas untuk memulai sesi pertama Anda.
+              </div>
+            ) : (
+              <div className="divide-y divide-[#DCE1D8]">
+                {/* Desktop table header */}
+                <div className="hidden sm:grid sm:grid-cols-12 gap-4 px-6 py-3 bg-[#F5F6F3] text-xs font-semibold text-[#626E67] uppercase tracking-wider">
+                  <div className="col-span-5">Gerakan</div>
+                  <div className="col-span-2">Set</div>
+                  <div className="col-span-3">Beban & Repetisi</div>
+                  <div className="col-span-2 text-right">RIR</div>
                 </div>
-              ))}
-            </div>
+
+                {history.slice(0, 8).map((log: WorkoutLogEntry) => (
+                  <div
+                    key={log.id}
+                    className="px-6 py-4 hover:bg-[#F5F6F3]/70 transition-colors"
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 items-start sm:items-center">
+                      {/* Exercise name + note */}
+                      <div className="sm:col-span-5 min-w-0">
+                        <p className="text-sm font-semibold text-[#141916] truncate">
+                          {log.exercise?.name || `Gerakan #${log.exercise_id}`}
+                        </p>
+                        {log.notes && (
+                          <p className="text-xs text-[#626E67] mt-1 flex items-center gap-1.5 truncate">
+                            <StickyNote className="w-3.5 h-3.5 text-[#C84B11] shrink-0" />
+                            <span className="truncate">{log.notes}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Set badge */}
+                      <div className="sm:col-span-2 flex items-center justify-between sm:justify-start">
+                        <span className="text-xs font-mono tabular-nums font-semibold px-2.5 py-1 rounded-lg bg-[#ECEFE9] text-[#48524C] border border-[#DCE1D8]">
+                          Set {log.set_number}
+                        </span>
+                        <span className="sm:hidden text-sm font-mono tabular-nums font-bold text-[#141916]">
+                          {log.weight} kg × {log.reps} reps
+                        </span>
+                      </div>
+
+                      {/* Weight x Reps (desktop) */}
+                      <div className="hidden sm:block sm:col-span-3 text-sm font-mono tabular-nums font-semibold text-[#141916]">
+                        {log.weight} kg × {log.reps} reps
+                      </div>
+
+                      {/* RIR Pill */}
+                      <div className="sm:col-span-2 flex sm:justify-end">
+                        {log.rir !== null && log.rir !== undefined ? (
+                          <span
+                            className={`text-xs font-mono tabular-nums font-semibold px-2.5 py-1 rounded-lg border ${getRirBadgeStyle(
+                              log.rir
+                            )}`}
+                          >
+                            RIR {log.rir}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-[#626E67]">—</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </section>
       </div>
     </main>
   );

@@ -36,23 +36,25 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4 bg-zinc-950 relative overflow-hidden">
-      {/* Background glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="max-w-md w-full bg-zinc-900/90 border border-zinc-800 p-8 rounded-3xl shadow-2xl backdrop-blur-xl relative z-10">
+    <main className="flex-1 flex items-center justify-center p-4 sm:p-6 bg-[#F5F6F3] text-[#141916]">
+      <div className="max-w-md w-full bg-white border border-[#DCE1D8] p-7 sm:p-8 rounded-2xl shadow-xs">
         <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto mb-3 text-amber-400 shadow-lg shadow-amber-500/10">
-            <Dumbbell className="w-7 h-7" />
+          <div className="w-12 h-12 bg-[#FFF1EA] border border-[#F4C4AC] rounded-xl flex items-center justify-center mx-auto mb-3.5 text-[#C84B11]">
+            <Dumbbell className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Masuk ke TrainSmart</h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Akses program latihan, progressive overload & bimbingan personal trainer.
+          <h1 className="text-2xl font-bold text-[#141916] tracking-tight">
+            Masuk ke TrainSmart
+          </h1>
+          <p className="text-sm text-[#48524C] mt-1.5">
+            Akses program latihan, progressive overload, dan bimbingan personal trainer.
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-950/50 border border-red-500/50 rounded-xl text-red-300 text-xs flex items-center space-x-2">
+          <div
+            role="alert"
+            className="mb-5 p-3.5 bg-[#FFF1F2] border border-[#FECDD3] rounded-xl text-[#BE123C] text-xs font-medium flex items-center gap-2.5"
+          >
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -60,30 +62,44 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Alamat Email</label>
+            <label
+              htmlFor="login-email"
+              className="block text-sm font-semibold text-[#141916] mb-1.5"
+            >
+              Alamat Email
+            </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Mail className="w-4 h-4 text-[#626E67] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
+                id="login-email"
                 type="email"
+                autoComplete="email"
                 placeholder="nama@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-zinc-950 border border-zinc-700/80 rounded-xl text-sm text-white placeholder:text-zinc-600 outline-none focus:border-amber-400 transition-colors"
+                className="w-full h-11 pl-10 pr-4 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#C84B11] transition-colors"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Kata Sandi</label>
+            <label
+              htmlFor="login-password"
+              className="block text-sm font-semibold text-[#141916] mb-1.5"
+            >
+              Kata Sandi
+            </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Lock className="w-4 h-4 text-[#626E67] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
+                id="login-password"
                 type="password"
-                placeholder="••••••••"
+                autoComplete="current-password"
+                placeholder="Masukkan kata sandi"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-zinc-950 border border-zinc-700/80 rounded-xl text-sm text-white placeholder:text-zinc-600 outline-none focus:border-amber-400 transition-colors"
+                className="w-full h-11 pl-10 pr-4 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#C84B11] transition-colors"
                 required
               />
             </div>
@@ -92,16 +108,19 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-zinc-950 font-black rounded-xl text-sm transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-2"
+            className="w-full h-11 bg-[#C84B11] hover:bg-[#A83D0B] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer mt-2"
           >
             <span>{isLoading ? "Memproses..." : "Masuk"}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-zinc-400">
+        <div className="mt-6 pt-5 border-t border-[#DCE1D8] text-center text-sm text-[#48524C]">
           Belum punya akun?{" "}
-          <Link href="/register" className="text-amber-400 font-bold hover:underline">
+          <Link
+            href="/register"
+            className="text-[#C84B11] font-semibold hover:underline"
+          >
             Daftar Sekarang
           </Link>
         </div>

@@ -2,20 +2,27 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { 
-  Award, 
-  CheckCircle2, 
-  Phone, 
-  Mail, 
-  Users, 
-  Sparkles, 
-  ShieldCheck, 
+import {
+  Award,
+  CheckCircle2,
+  Phone,
+  Mail,
+  Users,
   ArrowLeft,
-  X 
+  X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getTrainers } from "@/lib/api";
 import { User } from "@/types/workout";
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
+}
 
 export default function SelectTrainerPage() {
   const { user, chooseTrainer } = useAuth();
@@ -42,66 +49,72 @@ export default function SelectTrainerPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-4 sm:p-8 relative">
-      <div className="max-w-4xl mx-auto">
+    <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Navigation Breadcrumb */}
-        <div className="mb-6">
+        <div className="mb-5">
           <Link
             href="/"
-            className="inline-flex items-center space-x-2 text-xs font-semibold text-zinc-400 hover:text-amber-400 transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#48524C] hover:text-[#C84B11] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Kembali ke Beranda</span>
+            <span>Kembali ke Dashboard</span>
           </Link>
         </div>
 
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center space-x-2 text-amber-400 font-mono text-xs uppercase tracking-widest mb-1 font-bold">
-            <Award className="w-4 h-4" />
-            <span>Personal Trainer Directory</span>
-          </div>
-          <h1 className="text-3xl font-black text-white tracking-tight">
-            Pilih Personal Trainer Pendamping
+        <div className="mb-8 pb-6 border-b border-[#DCE1D8]">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#141916] tracking-tight flex items-center gap-2.5">
+            <Award className="w-7 h-7 text-[#C84B11]" />
+            <span>Pilih Personal Trainer Pendamping</span>
           </h1>
-          <p className="text-xs text-zinc-400 mt-1 max-w-xl">
-            Tingkatkan hasil latihan Anda dengan bimbingan pelatih profesional. Pelatih yang Anda pilih akan dapat memantau progres beban, repetisi, dan RIR Anda secara langsung.
+          <p className="text-sm text-[#48524C] mt-1.5 max-w-2xl">
+            Tingkatkan konsistensi latihan Anda dengan bimbingan pelatih profesional yang memantau progres beban, repetisi, dan RIR Anda.
           </p>
         </div>
 
         {actionMsg && (
-          <div className="mb-6 p-4 bg-emerald-950/60 border border-emerald-500/50 rounded-2xl text-emerald-300 text-xs flex items-center space-x-2 shadow-lg">
-            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-6 p-4 bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl text-[#047857] text-sm flex items-center gap-2.5 shadow-xs"
+          >
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
             <span className="font-semibold">{actionMsg}</span>
           </div>
         )}
 
         {/* Current Trainer Banner */}
-        <div className="mb-10 p-6 bg-gradient-to-r from-zinc-900 to-zinc-900/60 border border-zinc-800 rounded-3xl relative overflow-hidden backdrop-blur-md">
+        <div className="mb-8 p-5 sm:p-6 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1">
+              <span className="text-xs font-semibold text-[#626E67] block mb-1">
                 Status Bimbingan Saat Ini
               </span>
               {user?.trainer ? (
                 <div>
-                  <h3 className="text-xl font-bold text-white flex items-center space-x-2">
-                    <span>{user.trainer.name}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-mono">
-                      Pelatih Aktif Anda
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h2 className="text-xl font-bold text-[#141916]">
+                      {user.trainer.name}
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-lg bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D4ED8] text-xs font-semibold">
+                      Pelatih Aktif
                     </span>
-                  </h3>
-                  <p className="text-xs text-zinc-400 mt-1">
-                    Spesialisasi: {user.trainer.specialization || "General Hypertrophy"}
+                  </div>
+                  <p className="text-sm text-[#48524C] mt-1">
+                    Spesialisasi:{" "}
+                    <strong className="font-medium text-[#141916]">
+                      {user.trainer.specialization || "General Hypertrophy"}
+                    </strong>
                   </p>
                 </div>
               ) : (
                 <div>
-                  <h3 className="text-base font-bold text-zinc-300">
+                  <h2 className="text-base font-bold text-[#141916]">
                     Belum Memilih Personal Trainer
-                  </h3>
-                  <p className="text-xs text-zinc-500 mt-0.5">
-                    Anda saat ini berlatih secara mandiri. Pilih salah satu trainer bersertifikasi di bawah untuk evaluasi progres berkala.
+                  </h2>
+                  <p className="text-sm text-[#48524C] mt-0.5">
+                    Anda saat ini berlatih secara mandiri. Pilih salah satu pelatih di bawah untuk evaluasi progres berkala.
                   </p>
                 </div>
               )}
@@ -109,11 +122,12 @@ export default function SelectTrainerPage() {
 
             {user?.trainer && (
               <button
+                type="button"
                 onClick={() => handleSelect(null)}
                 disabled={isUpdating !== null}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-xl text-xs font-semibold transition-colors flex items-center space-x-1 self-start sm:self-auto"
+                className="h-10 px-4 bg-[#ECEFE9] hover:bg-[#FFF1F2] hover:text-[#BE123C] border border-[#DCE1D8] hover:border-[#FECDD3] text-[#48524C] rounded-xl text-xs font-semibold transition-colors flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
                 <span>Lepas Trainer</span>
               </button>
             )}
@@ -121,80 +135,117 @@ export default function SelectTrainerPage() {
         </div>
 
         {/* Available Trainers Grid */}
-        <div>
-          <h2 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
-            <Sparkles className="w-4 h-4 text-amber-400" />
+        <section aria-labelledby="trainers-list-heading">
+          <h2
+            id="trainers-list-heading"
+            className="text-lg font-bold text-[#141916] mb-4 flex items-center gap-2"
+          >
+            <Users className="w-5 h-5 text-[#C84B11]" />
             <span>Daftar Pelatih Tersedia</span>
           </h2>
 
           {isLoading ? (
-            <div className="p-8 text-center text-zinc-500 text-xs">Memuat daftar trainer...</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-busy="true">
+              {[1, 2].map((item) => (
+                <div
+                  key={item}
+                  className="p-6 bg-white border border-[#DCE1D8] rounded-2xl animate-pulse space-y-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-[#ECEFE9]" />
+                    <div className="space-y-2 flex-1">
+                      <div className="h-4 w-36 bg-[#ECEFE9] rounded" />
+                      <div className="h-3 w-24 bg-[#ECEFE9] rounded" />
+                    </div>
+                  </div>
+                  <div className="h-14 bg-[#ECEFE9] rounded-xl" />
+                  <div className="h-10 bg-[#ECEFE9] rounded-xl" />
+                </div>
+              ))}
+            </div>
           ) : trainers.length === 0 ? (
-            <div className="p-8 text-center text-zinc-500 text-xs">
+            <div className="p-10 text-center bg-white border border-[#DCE1D8] rounded-2xl text-sm text-[#48524C]">
               Belum ada Personal Trainer yang terdaftar di sistem.
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {trainers.map((trainer) => {
                 const isCurrent = user?.trainer_id === trainer.id;
 
                 return (
                   <div
                     key={trainer.id}
-                    className={`p-6 rounded-3xl border transition-all flex flex-col justify-between ${
+                    className={`p-6 rounded-2xl border transition-colors flex flex-col justify-between bg-white shadow-xs ${
                       isCurrent
-                        ? "bg-blue-950/20 border-blue-500/50 shadow-xl shadow-blue-500/5"
-                        : "bg-zinc-900/60 border-zinc-800 hover:border-zinc-700"
+                        ? "border-[#1D4ED8] bg-[#EFF6FF]/40"
+                        : "border-[#DCE1D8] hover:border-[#C5CCC0]"
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-lg text-white">{trainer.name}</span>
+                      <div className="flex items-start justify-between gap-3 mb-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${
+                              isCurrent
+                                ? "bg-[#1D4ED8] text-white"
+                                : "bg-[#ECEFE9] text-[#141916]"
+                            }`}
+                          >
+                            {getInitials(trainer.name)}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-lg text-[#141916] leading-tight">
+                              {trainer.name}
+                            </h3>
+                            <span className="text-xs text-[#626E67] font-mono tabular-nums">
+                              {trainer.clients_count || 0} Member aktif
+                            </span>
+                          </div>
+                        </div>
+
                         {isCurrent && (
-                          <span className="px-2.5 py-0.5 rounded-full bg-blue-500 text-zinc-950 font-bold text-[10px] font-mono">
-                            DIPILIH
+                          <span className="px-2.5 py-1 rounded-lg bg-[#1D4ED8] text-white font-semibold text-xs shrink-0">
+                            Dipilih
                           </span>
                         )}
                       </div>
 
-                      <div className="p-2.5 bg-zinc-950 rounded-xl border border-zinc-800/80 mb-4">
-                        <span className="text-[10px] text-zinc-500 font-mono uppercase block mb-0.5">
-                          Fokus & Keahlian:
+                      <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] mb-4">
+                        <span className="text-xs text-[#626E67] font-medium block mb-0.5">
+                          Fokus & Keahlian
                         </span>
-                        <p className="text-xs font-semibold text-amber-400">
-                          {trainer.specialization || "Hypertrophy & Progressive Overload"}
+                        <p className="text-sm font-semibold text-[#C84B11]">
+                          {trainer.specialization ||
+                            "Hypertrophy & Progressive Overload"}
                         </p>
                       </div>
 
-                      <div className="text-xs text-zinc-400 space-y-1.5 mb-6">
-                        <div className="flex items-center space-x-2">
-                          <Mail className="w-3.5 h-3.5 text-zinc-500" />
-                          <span>{trainer.email}</span>
+                      <div className="text-sm text-[#48524C] space-y-2 mb-6">
+                        <div className="flex items-center gap-2.5">
+                          <Mail className="w-4 h-4 text-[#626E67] shrink-0" />
+                          <span className="truncate">{trainer.email}</span>
                         </div>
                         {trainer.phone && (
-                          <div className="flex items-center space-x-2">
-                            <Phone className="w-3.5 h-3.5 text-zinc-500" />
+                          <div className="flex items-center gap-2.5">
+                            <Phone className="w-4 h-4 text-[#626E67] shrink-0" />
                             <span>{trainer.phone}</span>
                           </div>
                         )}
-                        <div className="flex items-center space-x-2">
-                          <Users className="w-3.5 h-3.5 text-zinc-500" />
-                          <span>{trainer.clients_count || 0} Member sedang dibimbing</span>
-                        </div>
                       </div>
                     </div>
 
                     <div>
                       {isCurrent ? (
-                        <div className="w-full py-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5">
+                        <div className="w-full h-11 bg-[#ECFDF5] border border-[#A7F3D0] text-[#047857] font-semibold rounded-xl text-sm flex items-center justify-center gap-2">
                           <CheckCircle2 className="w-4 h-4" />
                           <span>Trainer Anda Saat Ini</span>
                         </div>
                       ) : (
                         <button
+                          type="button"
                           onClick={() => handleSelect(trainer.id)}
                           disabled={isUpdating === trainer.id}
-                          className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-zinc-950 font-bold rounded-xl text-xs transition-all shadow-md shadow-amber-500/10 disabled:opacity-50"
+                          className="w-full h-11 bg-[#C84B11] hover:bg-[#A83D0B] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors cursor-pointer"
                         >
                           {isUpdating === trainer.id
                             ? "Memproses..."
@@ -209,7 +260,7 @@ export default function SelectTrainerPage() {
               })}
             </div>
           )}
-        </div>
+        </section>
       </div>
     </main>
   );

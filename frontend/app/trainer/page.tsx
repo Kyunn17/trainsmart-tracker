@@ -1,42 +1,42 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { 
-  Users, 
-  UserPlus, 
-  TrendingUp, 
-  Trash2, 
-  Award, 
-  Dumbbell, 
-  Flame, 
-  CheckCircle2, 
+import {
+  Users,
+  UserPlus,
+  TrendingUp,
+  Trash2,
+  Award,
+  CheckCircle2,
   AlertCircle,
   X,
-  Sparkles,
-  ArrowRight
+  Mail,
+  Phone,
+  StickyNote,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { 
-  getTrainerClients, 
-  addTrainerClient, 
-  removeTrainerClient, 
-  getClientProgress 
+import {
+  getTrainerClients,
+  addTrainerClient,
+  removeTrainerClient,
+  getClientProgress,
 } from "@/lib/api";
-import { User, ClientProgressResponse } from "@/types/workout";
+import { User, ClientProgressResponse, WorkoutLogEntry } from "@/types/workout";
 
 export default function TrainerDashboard() {
   const { user } = useAuth();
   const [clients, setClients] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Add client modal / state
   const [newClientEmail, setNewClientEmail] = useState("");
-  const [addMsg, setAddMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [addMsg, setAddMsg] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
-  // Client progress inspection modal
-  const [selectedClientProgress, setSelectedClientProgress] = useState<ClientProgressResponse | null>(null);
+  const [selectedClientProgress, setSelectedClientProgress] =
+    useState<ClientProgressResponse | null>(null);
   const [isLoadingProgress, setIsLoadingProgress] = useState(false);
 
   const loadClients = async () => {
@@ -47,8 +47,27 @@ export default function TrainerDashboard() {
   };
 
   useEffect(() => {
-    loadClients();
+    let active = true;
+    getTrainerClients().then((data) => {
+      if (!active) return;
+      setClients(data);
+      setIsLoading(false);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && (selectedClientProgress || isLoadingProgress)) {
+        setSelectedClientProgress(null);
+        setIsLoadingProgress(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedClientProgress, isLoadingProgress]);
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,46 +103,42 @@ export default function TrainerDashboard() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-4 sm:p-8 relative">
-      <div className="max-w-5xl mx-auto">
+    <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-8 border-b border-zinc-800 gap-4">
+        <div className="flex flex-col md:flex-row md:items-end justify-between pb-6 mb-8 border-b border-[#DCE1D8] gap-4">
           <div>
-            <div className="flex items-center space-x-2 text-blue-400 font-mono text-xs uppercase tracking-widest mb-1 font-bold">
-              <Users className="w-4 h-4" />
-              <span>Trainer Portal • Roster Management</span>
-            </div>
-            <h1 className="text-3xl font-black text-white tracking-tight">
-              Klien Bimbingan {user?.name || "Personal Trainer"}
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#141916] tracking-tight flex items-center gap-2.5">
+              <Users className="w-7 h-7 text-[#1D4ED8]" />
+              <span>Klien Bimbingan {user?.name || "Personal Trainer"}</span>
             </h1>
-            <p className="text-xs text-zinc-400 mt-1">
-              Pantau progres latihan, beban angkatan, dan kepatuhan hipertrofi setiap klien Anda.
+            <p className="text-sm text-[#48524C] mt-1.5">
+              Pantau progres latihan, beban angkatan, dan konsistensi RIR setiap klien Anda.
             </p>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <span className="px-3.5 py-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-mono font-bold rounded-full">
-              {clients.length} Klien Aktif
-            </span>
-          </div>
+          <span className="px-3.5 py-2 bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D4ED8] text-xs font-mono tabular-nums font-semibold rounded-xl self-start md:self-auto">
+            {clients.length} Klien Aktif
+          </span>
         </div>
 
         {/* Add Client Form Card */}
-        <div className="mb-8 p-6 bg-gradient-to-r from-zinc-900/90 to-zinc-900/50 border border-zinc-800 rounded-3xl backdrop-blur-md">
-          <h2 className="text-sm font-bold text-white mb-2 flex items-center space-x-2">
-            <UserPlus className="w-4 h-4 text-blue-400" />
-            <span>Tambah Klien Baru ke Roster Anda</span>
+        <div className="mb-8 p-6 bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
+          <h2 className="text-base font-bold text-[#141916] mb-1 flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-[#1D4ED8]" />
+            <span>Tambah Klien Baru ke Roster</span>
           </h2>
-          <p className="text-xs text-zinc-400 mb-4">
-            Masukkan alamat email member yang sudah terdaftar di TrainSmart untuk menghubungkan mereka dengan akun Anda.
+          <p className="text-sm text-[#48524C] mb-4">
+            Masukkan alamat email member yang sudah terdaftar di TrainSmart untuk menghubungkan akun mereka.
           </p>
 
           {addMsg && (
             <div
-              className={`mb-4 p-3 rounded-xl text-xs flex items-center space-x-2 ${
+              role="status"
+              className={`mb-4 p-3.5 rounded-xl text-xs font-medium flex items-center gap-2 ${
                 addMsg.type === "success"
-                  ? "bg-emerald-950/50 border border-emerald-500/50 text-emerald-300"
-                  : "bg-red-950/50 border border-red-500/50 text-red-300"
+                  ? "bg-[#ECFDF5] border border-[#A7F3D0] text-[#047857]"
+                  : "bg-[#FFF1F2] border border-[#FECDD3] text-[#BE123C]"
               }`}
             >
               {addMsg.type === "success" ? (
@@ -135,19 +150,23 @@ export default function TrainerDashboard() {
             </div>
           )}
 
-          <form onSubmit={handleAddClient} className="flex flex-col sm:flex-row gap-2.5">
+          <form
+            onSubmit={handleAddClient}
+            className="flex flex-col sm:flex-row gap-2.5"
+          >
             <input
               type="email"
+              aria-label="Email klien"
               placeholder="Masukkan email klien (misal: budi@trainsmart.com)..."
               value={newClientEmail}
               onChange={(e) => setNewClientEmail(e.target.value)}
-              className="flex-1 px-4 py-2.5 bg-zinc-950 border border-zinc-700/80 rounded-xl text-xs text-white placeholder:text-zinc-600 outline-none focus:border-blue-400"
+              className="flex-1 h-11 px-4 bg-[#F5F6F3] border border-[#DCE1D8] focus:bg-white focus:border-[#1D4ED8] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none transition-colors"
               required
             />
             <button
               type="submit"
               disabled={isAdding}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition-colors flex items-center justify-center space-x-1.5"
+              className="h-11 px-6 bg-[#1D4ED8] hover:bg-[#1E40AF] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer shrink-0"
             >
               <UserPlus className="w-4 h-4" />
               <span>{isAdding ? "Menghubungkan..." : "Hubungkan Klien"}</span>
@@ -156,20 +175,39 @@ export default function TrainerDashboard() {
         </div>
 
         {/* Client Roster Grid */}
-        <div>
-          <h2 className="text-base font-bold text-white mb-4 flex items-center space-x-2">
-            <Award className="w-4 h-4 text-amber-400" />
+        <section aria-labelledby="client-roster-heading">
+          <h2
+            id="client-roster-heading"
+            className="text-lg font-bold text-[#141916] mb-4 flex items-center gap-2"
+          >
+            <Award className="w-5 h-5 text-[#C84B11]" />
             <span>Daftar Klien Anda</span>
           </h2>
 
           {isLoading ? (
-            <div className="p-8 text-center text-zinc-500 text-xs">Memuat data klien...</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-busy="true">
+              {[1, 2].map((item) => (
+                <div
+                  key={item}
+                  className="p-5 bg-white border border-[#DCE1D8] rounded-2xl animate-pulse space-y-4"
+                >
+                  <div className="h-5 w-40 bg-[#ECEFE9] rounded" />
+                  <div className="h-4 w-52 bg-[#ECEFE9] rounded" />
+                  <div className="h-16 bg-[#ECEFE9] rounded-xl" />
+                  <div className="h-10 bg-[#ECEFE9] rounded-xl" />
+                </div>
+              ))}
+            </div>
           ) : clients.length === 0 ? (
-            <div className="p-10 text-center bg-zinc-900/40 border border-zinc-800 rounded-3xl">
-              <Users className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-              <h3 className="text-sm font-bold text-white mb-1">Belum Ada Klien Terdaftar</h3>
-              <p className="text-xs text-zinc-400 max-w-sm mx-auto">
-                Tambahkan klien pertama Anda menggunakan form email di atas, atau minta klien memilih Anda di menu akun mereka.
+            <div className="p-10 text-center bg-white border border-[#DCE1D8] rounded-2xl shadow-xs">
+              <div className="w-12 h-12 rounded-2xl bg-[#ECEFE9] text-[#48524C] flex items-center justify-center mx-auto mb-3">
+                <Users className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-[#141916] mb-1">
+                Belum Ada Klien Terdaftar
+              </h3>
+              <p className="text-sm text-[#48524C] max-w-md mx-auto">
+                Tambahkan klien pertama Anda menggunakan formulir di atas, atau minta klien memilih Anda dari halaman akun mereka.
               </p>
             </div>
           ) : (
@@ -179,55 +217,74 @@ export default function TrainerDashboard() {
                 return (
                   <div
                     key={client.id}
-                    className="p-5 bg-zinc-900/70 border border-zinc-800 rounded-2xl hover:border-zinc-700 transition-all flex flex-col justify-between"
+                    className="p-5 bg-white border border-[#DCE1D8] rounded-2xl hover:border-[#C5CCC0] transition-colors flex flex-col justify-between shadow-xs"
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-white text-base">{client.name}</span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          {client.workout_logs_count || 0} Set Dicatat
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <h3 className="font-bold text-[#141916] text-lg truncate">
+                          {client.name}
+                        </h3>
+                        <span className="text-xs font-mono tabular-nums font-semibold px-2.5 py-1 rounded-lg bg-[#ECFDF5] text-[#047857] border border-[#A7F3D0] shrink-0">
+                          {client.workout_logs_count || 0} Set
                         </span>
                       </div>
 
-                      <div className="text-xs text-zinc-400 space-y-1 mb-4">
-                        <p>📧 {client.email}</p>
-                        {client.phone && <p>📱 {client.phone}</p>}
+                      <div className="text-sm text-[#48524C] space-y-1.5 mb-4">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-[#626E67] shrink-0" />
+                          <span className="truncate">{client.email}</span>
+                        </div>
+                        {client.phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-4 h-4 text-[#626E67] shrink-0" />
+                            <span>{client.phone}</span>
+                          </div>
+                        )}
                       </div>
 
                       {latestLog ? (
-                        <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800/80 mb-4 text-xs">
-                          <span className="text-[10px] uppercase font-mono text-zinc-500 block mb-1">
-                            Aktivitas Terakhir:
+                        <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] mb-4 text-sm">
+                          <span className="text-xs font-medium text-[#626E67] block mb-1">
+                            Aktivitas Terakhir
                           </span>
-                          <span className="font-semibold text-zinc-200">
+                          <span className="font-semibold text-[#141916] block">
                             {latestLog.exercise?.name || "Latihan"}
                           </span>
-                          <span className="text-amber-400 font-mono block mt-0.5">
-                            {latestLog.weight} kg × {latestLog.reps} reps (RIR {latestLog.rir})
+                          <span className="text-[#C84B11] font-mono tabular-nums font-semibold text-xs block mt-0.5">
+                            {latestLog.weight} kg × {latestLog.reps} reps (RIR{" "}
+                            {latestLog.rir})
                           </span>
                           {latestLog.notes && (
-                            <p className="text-zinc-500 italic mt-1 truncate">"{latestLog.notes}"</p>
+                            <p className="text-xs text-[#48524C] mt-1.5 flex items-center gap-1.5 truncate">
+                              <StickyNote className="w-3.5 h-3.5 text-[#C84B11] shrink-0" />
+                              <span className="truncate">{latestLog.notes}</span>
+                            </p>
                           )}
                         </div>
                       ) : (
-                        <div className="p-3 bg-zinc-950 rounded-xl border border-zinc-800/80 mb-4 text-xs text-zinc-500 italic">
+                        <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] mb-4 text-xs text-[#626E67]">
                           Belum ada catatan latihan yang masuk.
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center space-x-2 pt-3 border-t border-zinc-800">
+                    <div className="flex items-center gap-2 pt-3 border-t border-[#DCE1D8]">
                       <button
+                        type="button"
                         onClick={() => handleViewProgress(client.id)}
-                        className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5"
+                        className="flex-1 h-10 bg-[#1D4ED8] hover:bg-[#1E40AF] text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                       >
-                        <TrendingUp className="w-3.5 h-3.5" />
+                        <TrendingUp className="w-4 h-4" />
                         <span>Lihat Analisis Progres</span>
                       </button>
 
                       <button
-                        onClick={() => handleRemoveClient(client.id, client.name)}
-                        className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-950/30 rounded-xl transition-colors"
+                        type="button"
+                        onClick={() =>
+                          handleRemoveClient(client.id, client.name)
+                        }
+                        className="h-10 w-10 flex items-center justify-center text-[#626E67] hover:text-[#BE123C] hover:bg-[#FFF1F2] border border-[#DCE1D8] hover:border-[#FECDD3] rounded-xl transition-colors cursor-pointer"
+                        aria-label={`Lepas ${client.name}`}
                         title="Lepas Klien"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -238,99 +295,143 @@ export default function TrainerDashboard() {
               })}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Client Progress Modal */}
-        {selectedClientProgress && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-            <div className="bg-zinc-900 border border-zinc-800 p-6 md:p-8 rounded-3xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto relative">
+        {/* Client Progress Modal (loading or loaded) */}
+        {(isLoadingProgress || selectedClientProgress) && (
+          <div
+            className="fixed inset-0 bg-[#141916]/65 z-50 flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="client-progress-modal-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setSelectedClientProgress(null);
+                setIsLoadingProgress(false);
+              }
+            }}
+          >
+            <div className="bg-white border border-[#DCE1D8] p-6 sm:p-7 rounded-2xl max-w-2xl w-full shadow-xl max-h-[90vh] overflow-y-auto relative">
               <button
-                onClick={() => setSelectedClientProgress(null)}
-                className="absolute top-5 right-5 p-2 text-zinc-400 hover:text-white rounded-xl bg-zinc-800 transition-colors"
+                type="button"
+                onClick={() => {
+                  setSelectedClientProgress(null);
+                  setIsLoadingProgress(false);
+                }}
+                className="absolute top-4 right-4 h-9 w-9 text-[#48524C] hover:text-[#141916] rounded-xl bg-[#ECEFE9] hover:bg-[#DCE1D8] flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="Tutup analisis progres"
               >
                 <X className="w-4 h-4" />
               </button>
 
-              <div className="mb-6">
-                <span className="text-xs text-blue-400 font-mono font-bold uppercase">
-                  Progressive Overload Report
-                </span>
-                <h3 className="text-2xl font-black text-white mt-1">
-                  Progres Latihan: {selectedClientProgress.client.name}
-                </h3>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Evaluasi volume angkatan dan intensitas RIR untuk menjaga hipertrofi tetap progresif.
-                </p>
-              </div>
-
-              {/* Summary KPIs */}
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 text-center">
-                  <span className="text-[11px] text-zinc-400 block mb-1">Total Set Selesai</span>
-                  <span className="text-xl font-bold text-amber-400">
-                    {selectedClientProgress.summary.total_sets}
-                  </span>
+              {isLoadingProgress ? (
+                <div className="space-y-4 py-4 animate-pulse" aria-busy="true">
+                  <div className="h-6 w-56 bg-[#ECEFE9] rounded" />
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="h-20 bg-[#ECEFE9] rounded-xl" />
+                    <div className="h-20 bg-[#ECEFE9] rounded-xl" />
+                    <div className="h-20 bg-[#ECEFE9] rounded-xl" />
+                  </div>
+                  <div className="h-40 bg-[#ECEFE9] rounded-xl" />
                 </div>
-                <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 text-center">
-                  <span className="text-[11px] text-zinc-400 block mb-1">Total Volume Angkatan</span>
-                  <span className="text-xl font-bold text-emerald-400">
-                    {selectedClientProgress.summary.total_volume_kg.toLocaleString()} kg
-                  </span>
-                </div>
-                <div className="p-3 bg-zinc-950 rounded-2xl border border-zinc-800 text-center">
-                  <span className="text-[11px] text-zinc-400 block mb-1">Rata-Rata RIR</span>
-                  <span className="text-xl font-bold text-blue-400">
-                    {selectedClientProgress.summary.average_rir ?? "-"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Set-by-set Log Table */}
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">
-                  Riwayat Eksekusi Set & Catatan Form
-                </h4>
-
-                {selectedClientProgress.data.length === 0 ? (
-                  <p className="text-xs text-zinc-500 italic text-center py-6">
-                    Klien belum melakukan pencatatan latihan.
-                  </p>
-                ) : (
-                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                    {selectedClientProgress.data.map((log: any) => (
-                      <div
-                        key={log.id}
-                        className="p-3 bg-zinc-950 border border-zinc-800/80 rounded-xl text-xs flex items-center justify-between"
+              ) : (
+                selectedClientProgress && (
+                  <>
+                    <div className="mb-6 pr-8">
+                      <h3
+                        id="client-progress-modal-title"
+                        className="text-2xl font-bold text-[#141916]"
                       >
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-semibold text-white">
-                              {log.exercise?.name || `Gerakan #${log.exercise_id}`}
-                            </span>
-                            <span className="text-[10px] text-amber-400 font-mono bg-amber-400/10 px-2 py-0.5 rounded-md">
-                              Set {log.set_number}
-                            </span>
-                          </div>
-                          {log.notes && (
-                            <p className="text-zinc-400 italic text-[11px] mt-1">
-                              📝 "{log.notes}"
-                            </p>
+                        Progres Latihan: {selectedClientProgress.client.name}
+                      </h3>
+                      <p className="text-sm text-[#48524C] mt-1">
+                        Evaluasi volume angkatan dan intensitas RIR untuk menjaga progres hipertrofi.
+                      </p>
+                    </div>
+
+                    {/* Summary KPIs */}
+                    <div className="grid grid-cols-3 gap-3 mb-6">
+                      <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] text-center">
+                        <span className="text-xs text-[#626E67] block mb-1">
+                          Total Set
+                        </span>
+                        <span className="text-xl font-bold font-mono tabular-nums text-[#C84B11]">
+                          {selectedClientProgress.summary.total_sets}
+                        </span>
+                      </div>
+                      <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] text-center">
+                        <span className="text-xs text-[#626E67] block mb-1">
+                          Total Volume
+                        </span>
+                        <span className="text-xl font-bold font-mono tabular-nums text-[#047857]">
+                          {selectedClientProgress.summary.total_volume_kg.toLocaleString()}{" "}
+                          kg
+                        </span>
+                      </div>
+                      <div className="p-3.5 bg-[#F5F6F3] rounded-xl border border-[#DCE1D8] text-center">
+                        <span className="text-xs text-[#626E67] block mb-1">
+                          Rata-rata RIR
+                        </span>
+                        <span className="text-xl font-bold font-mono tabular-nums text-[#1D4ED8]">
+                          {selectedClientProgress.summary.average_rir ?? "-"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Set-by-set Log List */}
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-[#626E67] mb-3">
+                        Riwayat Eksekusi Set & Catatan Form
+                      </h4>
+
+                      {selectedClientProgress.data.length === 0 ? (
+                        <div className="p-6 bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl text-sm text-[#48524C] text-center">
+                          Klien belum melakukan pencatatan latihan.
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                          {selectedClientProgress.data.map(
+                            (log: WorkoutLogEntry) => (
+                              <div
+                                key={log.id}
+                                className="p-3.5 bg-[#F5F6F3] border border-[#DCE1D8] rounded-xl text-sm flex items-center justify-between gap-3"
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-semibold text-[#141916]">
+                                      {log.exercise?.name ||
+                                        `Gerakan #${log.exercise_id}`}
+                                    </span>
+                                    <span className="text-xs text-[#C84B11] font-mono tabular-nums font-semibold bg-[#FFF1EA] border border-[#F4C4AC] px-2 py-0.5 rounded-md">
+                                      Set {log.set_number}
+                                    </span>
+                                  </div>
+                                  {log.notes && (
+                                    <p className="text-[#48524C] text-xs mt-1 flex items-center gap-1.5">
+                                      <StickyNote className="w-3.5 h-3.5 text-[#C84B11] shrink-0" />
+                                      <span>{log.notes}</span>
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  <span className="font-mono tabular-nums font-bold text-[#047857] text-sm block">
+                                    {log.weight} kg × {log.reps} reps
+                                  </span>
+                                  <span className="text-xs text-[#626E67] font-mono tabular-nums">
+                                    RIR: {log.rir ?? "-"}{" "}
+                                    {log.rpe ? `• RPE: ${log.rpe}` : ""}
+                                  </span>
+                                </div>
+                              </div>
+                            )
                           )}
                         </div>
-
-                        <div className="text-right">
-                          <span className="font-mono font-bold text-emerald-400 text-sm">
-                            {log.weight} kg × {log.reps} reps
-                          </span>
-                          <span className="block text-[10px] text-zinc-400 font-mono">
-                            RIR: {log.rir ?? "-"} {log.rpe ? `• RPE: ${log.rpe}` : ""}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      )}
+                    </div>
+                  </>
+                )
+              )}
             </div>
           </div>
         )}

@@ -1,7 +1,17 @@
+export interface ExerciseImage {
+  id: number;
+  exercise_id: number;
+  path: string;
+  url: string;
+  position: number;
+  alt_text?: string | null;
+}
+
 export interface WorkoutLogEntry {
   id?: number;
   user_id?: number | null;
   exercise_id: number;
+  daily_session_id?: number | null;
   exercise?: Exercise;
   set_number: number;
   weight: number | string;
@@ -21,14 +31,62 @@ export interface SetData {
   isCompleted: boolean;
 }
 
+export interface ExercisePivot {
+  is_default_recommended: boolean;
+  default_sets: number;
+  default_rep_range: string;
+  sort_order: number;
+}
+
 export interface Exercise {
   id: number;
-  category_id?: number;
+  category_id?: number | null;
   name: string;
+  slug?: string | null;
+  primary_muscle?: string | null;
+  secondary_muscles?: string[] | null;
+  equipment?: string | null;
+  movement_pattern?: string | null;
+  difficulty?: "beginner" | "intermediate" | "advanced" | string;
+  is_beginner_friendly?: boolean;
+  instructions?: string[] | null;
+  common_mistakes?: string[] | null;
+  tips?: string[] | null;
+  video_url?: string | null;
+  is_active?: boolean;
+  images?: ExerciseImage[];
+  pivot?: ExercisePivot;
   targetSets?: number;
   setsData?: SetData[];
   workout_logs?: WorkoutLogEntry[];
   notes?: string;
+}
+
+export interface SplitSession {
+  id: number;
+  split_id: number;
+  slug: string;
+  name: string;
+  session_type: string;
+  muscle_groups: string[];
+  default_day_of_week?: number | null;
+  sort_order: number;
+  exercises?: Exercise[];
+}
+
+export interface Split {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  min_days: number;
+  max_days: number;
+  pros: string[];
+  cons: string[];
+  suitable_for: string;
+  is_active: boolean;
+  sort_order: number;
+  sessions?: SplitSession[];
 }
 
 export interface Category {
@@ -66,4 +124,3 @@ export interface ClientProgressResponse {
   summary: ClientProgressSummary;
   data: WorkoutLogEntry[];
 }
-
