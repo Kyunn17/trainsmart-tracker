@@ -27,7 +27,7 @@ class UpdateCustomExerciseRequest extends FormRequest
             'common_mistakes' => ['nullable', 'array', 'max:5'],
             'common_mistakes.*' => ['string', 'max:300'],
             'notes' => ['nullable', 'string', 'max:600'],
-            'session_types' => ['nullable', 'array', 'max:8'],
+            'session_types' => ['nullable', 'array', 'max:13'],
             'session_types.*' => ['string', 'in:' . implode(',', StoreCustomExerciseRequest::ALLOWED_SESSIONS)],
         ];
     }

@@ -16,6 +16,8 @@ class AdminUpdateSplitRequest extends FormRequest
         return [
             'name' => ['sometimes', 'string', 'max:255'],
             'description' => ['sometimes', 'string'],
+            'days_per_week' => ['sometimes', 'integer', 'min:2', 'max:6'],
+            'recommendation_level' => ['sometimes', 'string', 'in:recommended,alternative,not_recommended'],
             'min_days' => ['sometimes', 'integer', 'min:2', 'max:6'],
             'max_days' => ['sometimes', 'integer', 'min:2', 'max:6', 'gte:min_days'],
             'pros' => ['sometimes', 'array'],
@@ -23,6 +25,7 @@ class AdminUpdateSplitRequest extends FormRequest
             'cons' => ['sometimes', 'array'],
             'cons.*' => ['string', 'max:500'],
             'suitable_for' => ['sometimes', 'string'],
+            'not_recommended_reason' => ['nullable', 'string'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

@@ -8,7 +8,9 @@ use App\Models\Split;
 class SplitController extends Controller
 {
     /**
-     * Recommend 1-3 splits matching the user's weekly training days (2-6).
+     * Return all active splits matching the requested days_per_week (2-6),
+     * ordered by recommendation_level (recommended -> alternative -> not_recommended),
+     * then by sort_order, including sessions in defined order and computed muscle_frequency.
      */
     public function recommendations(SplitRecommendationRequest $request)
     {
@@ -16,9 +18,9 @@ class SplitController extends Controller
 
         $splits = Split::query()
             ->where('is_active', true)
-            ->where('min_days', '<=', $days)
-            ->where('max_days', '>=', $days)
+            ->where('days_per_week', $days)
             ->with('sessions')
+            ->orderByRaw("CASE recommendation_level WHEN 'recommended' THEN 1 WHEN 'alternative' THEN 2 WHEN 'not_recommended' THEN 3 ELSE 4 END ASC")
             ->orderBy('sort_order')
             ->get();
 

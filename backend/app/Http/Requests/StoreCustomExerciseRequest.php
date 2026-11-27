@@ -28,7 +28,8 @@ class StoreCustomExerciseRequest extends FormRequest
     ];
 
     public const ALLOWED_SESSIONS = [
-        'push', 'pull', 'legs', 'upper', 'lower', 'full_body', 'anterior', 'posterior',
+        'push', 'pull', 'legs', 'upper', 'lower', 'full_body',
+        'anterior', 'posterior', 'arms_delts', 'chest', 'back', 'shoulders', 'arms',
     ];
 
     public function authorize(): bool
@@ -50,7 +51,7 @@ class StoreCustomExerciseRequest extends FormRequest
             'common_mistakes' => ['nullable', 'array', 'max:5'],
             'common_mistakes.*' => ['string', 'max:300'],
             'notes' => ['nullable', 'string', 'max:600'],
-            'session_types' => ['nullable', 'array', 'max:8'],
+            'session_types' => ['nullable', 'array', 'max:13'],
             'session_types.*' => ['string', 'in:' . implode(',', self::ALLOWED_SESSIONS)],
             'image' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ];

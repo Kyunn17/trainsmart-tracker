@@ -29,8 +29,43 @@ class ScheduleValidationService
         'core' => 'Core',
     ];
 
+    private const SHOULDER_REGIONS = ['front_delt', 'lateral_delt', 'rear_delt'];
+
+    /**
+     * Compute weekly training frequency per major muscle group from scheduled sessions.
+     *
+     * @param  array<int, array{day_of_week: int, split_session_id: int|null}>  $scheduleItems
+     * @return array<string, int>
+     */
+    public function computeWeeklyMuscleFrequency(Split $split, array $scheduleItems): array
+    {
+        $sessionsById = $split->sessions()->get()->keyBy('id');
+        $counts = array_fill_keys(Split::MAJOR_MUSCLES, 0);
+
+        foreach ($scheduleItems as $item) {
+            $sessionId = $item['split_session_id'] ?? null;
+            if (!$sessionId) {
+                continue;
+            }
+            $session = $sessionsById->get((int) $sessionId);
+            if (!$session) {
+                continue;
+            }
+
+            $groups = array_unique((array) ($session->muscle_groups ?? []));
+            foreach ($groups as $muscle) {
+                if (array_key_exists($muscle, $counts)) {
+                    $counts[$muscle]++;
+                }
+            }
+        }
+
+        return $counts;
+    }
+
     /**
      * Validate a Monday-Sunday schedule and return advisory warnings (never blocks saving).
+     * Computed dynamically from session templates (`muscle_groups`, `muscle_regions`), never from split names.
      *
      * @param  array<int, array{day_of_week: int, split_session_id: int|null}>  $scheduleItems
      * @return array<int, array{code: string, severity: string, message: string, days: int[]}>
@@ -52,6 +87,7 @@ class ScheduleValidationService
         }
 
         $trainingDaysCount = collect($byDay)->filter()->count();
+        $frequency = $this->computeWeeklyMuscleFrequency($split, $scheduleItems);
 
         // 1. Check if there is at least 1 rest day
         if ($trainingDaysCount === 7) {
@@ -73,7 +109,38 @@ class ScheduleValidationService
             ];
         }
 
-        // 3. Check consecutive days training the same muscle group (including Sunday -> Monday wrap-around)
+        // 3. Weekly coverage checks (derived strictly from muscle_groups of scheduled sessions)
+        if ($trainingDaysCount > 0) {
+            $lowerCoverage = ($frequency['quads'] ?? 0) + ($frequency['hamstrings'] ?? 0) + ($frequency['glutes'] ?? 0);
+            if ($lowerCoverage === 0) {
+                $warnings[] = [
+                    'code' => 'no_lower_body_session',
+                    'severity' => 'warning',
+                    'message' => 'Jadwal minggu ini belum memiliki sesi kaki / tubuh bawah (Quads, Hamstring, atau Glutes). Tambahkan minimal 1 sesi untuk keseimbangan proporsi tubuh.',
+                    'days' => [],
+                ];
+            }
+
+            if (($frequency['chest'] ?? 0) === 0) {
+                $warnings[] = [
+                    'code' => 'no_chest_session',
+                    'severity' => 'warning',
+                    'message' => 'Jadwal minggu ini belum melatih otot Dada (Chest).',
+                    'days' => [],
+                ];
+            }
+
+            if (($frequency['back'] ?? 0) === 0) {
+                $warnings[] = [
+                    'code' => 'no_back_session',
+                    'severity' => 'warning',
+                    'message' => 'Jadwal minggu ini belum melatih otot Punggung (Back).',
+                    'days' => [],
+                ];
+            }
+        }
+
+        // 4. Check consecutive days training the same muscle group (including Sunday -> Monday wrap-around)
         $pairs = [
             [1, 2],
             [2, 3],
@@ -95,6 +162,21 @@ class ScheduleValidationService
             $musclesA = (array) ($sessionA->muscle_groups ?? []);
             $musclesB = (array) ($sessionB->muscle_groups ?? []);
             $overlap = array_values(array_intersect($musclesA, $musclesB));
+
+            // Region-aware shoulder check: Push/Anterior (front_delt, lateral_delt) followed by
+            // Pull/Posterior (rear_delt) does NOT overlap shoulder sub-regions.
+            if (in_array('shoulders', $overlap, true)) {
+                $regionsA = (array) ($sessionA->muscle_regions ?? []);
+                $regionsB = (array) ($sessionB->muscle_regions ?? []);
+
+                if (!empty($regionsA) && !empty($regionsB)) {
+                    $deltA = array_intersect($regionsA, self::SHOULDER_REGIONS);
+                    $deltB = array_intersect($regionsB, self::SHOULDER_REGIONS);
+                    if (empty(array_intersect($deltA, $deltB))) {
+                        $overlap = array_values(array_diff($overlap, ['shoulders']));
+                    }
+                }
+            }
 
             if (!empty($overlap)) {
                 $muscleNames = implode(', ', array_map(

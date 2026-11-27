@@ -11,6 +11,14 @@ use Illuminate\Support\Facades\Storage;
 
 class CuratedExerciseSeeder extends Seeder
 {
+    private const FOCUSED_DYNAMIC_TYPES = [
+        'arms_delts',
+        'chest',
+        'back',
+        'shoulders',
+        'arms',
+    ];
+
     public function run(): void
     {
         $items = require database_path('data/curated_exercises.php');
@@ -29,10 +37,8 @@ class CuratedExerciseSeeder extends Seeder
             'other' => $legsCat->id,
         ];
 
-        // Preload split sessions grouped by session_type
-        $sessionsByType = SplitSession::query()
-            ->get()
-            ->groupBy('session_type');
+        // Preload all split sessions so mapping is driven by session `muscle_regions`
+        $allSplitSessions = SplitSession::query()->get();
 
         $sortOrder = 1;
 
@@ -68,20 +74,29 @@ class CuratedExerciseSeeder extends Seeder
                 ]
             );
 
-            // Sync split_sessions pivot idempotently
+            // Sync split_sessions pivot idempotently using each session's `muscle_regions`
             $syncData = [];
-            foreach ($sessionTypes as $type) {
-                $matchingSessions = $sessionsByType->get($type, collect());
-                $isRecommended = in_array($type, $recommendedTypes, true);
+            foreach ($allSplitSessions as $splitSession) {
+                $regions = (array) ($splitSession->muscle_regions ?? []);
+                $matchesByRegion = !empty($regions)
+                    ? in_array($exercise->muscle_region, $regions, true)
+                    : in_array($splitSession->session_type, $sessionTypes, true);
 
-                foreach ($matchingSessions as $splitSession) {
-                    $syncData[$splitSession->id] = [
-                        'is_default_recommended' => $isRecommended,
-                        'default_sets' => $defaultSets,
-                        'default_rep_range' => $defaultRepRange,
-                        'sort_order' => $sortOrder,
-                    ];
+                if (!$matchesByRegion) {
+                    continue;
                 }
+
+                $isNewFocusedType = in_array($splitSession->session_type, self::FOCUSED_DYNAMIC_TYPES, true);
+                $isRecommended = $isNewFocusedType
+                    ? (bool) ($item['is_beginner_friendly'] ?? true)
+                    : in_array($splitSession->session_type, $recommendedTypes, true);
+
+                $syncData[$splitSession->id] = [
+                    'is_default_recommended' => $isRecommended,
+                    'default_sets' => $defaultSets,
+                    'default_rep_range' => $defaultRepRange,
+                    'sort_order' => $sortOrder,
+                ];
             }
 
             if (!empty($syncData)) {

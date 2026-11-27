@@ -18,7 +18,7 @@ class UserPlanController extends Controller
     }
 
     /**
-     * Get the authenticated user's active plan and 7-day schedule.
+     * Get the authenticated user's active plan, 7-day schedule, advisory warnings, and muscle frequency.
      */
     public function show(Request $request)
     {
@@ -34,6 +34,7 @@ class UserPlanController extends Controller
                 'status' => 'success',
                 'data' => null,
                 'warnings' => [],
+                'muscle_frequency' => [],
             ]);
         }
 
@@ -48,10 +49,16 @@ class UserPlanController extends Controller
             $plan->days_per_week
         );
 
+        $muscleFrequency = $this->validatorService->computeWeeklyMuscleFrequency(
+            $plan->split,
+            $scheduleItems
+        );
+
         return response()->json([
             'status' => 'success',
             'data' => $plan,
             'warnings' => $warnings,
+            'muscle_frequency' => $muscleFrequency,
         ]);
     }
 
@@ -95,16 +102,22 @@ class UserPlanController extends Controller
             (int) $validated['days_per_week']
         );
 
+        $muscleFrequency = $this->validatorService->computeWeeklyMuscleFrequency(
+            $split,
+            $validated['schedule']
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Rencana dan jadwal latihan mingguan berhasil disimpan!',
             'data' => $plan,
             'warnings' => $warnings,
+            'muscle_frequency' => $muscleFrequency,
         ], 201);
     }
 
     /**
-     * Validate a proposed schedule without persisting (advisory warnings only).
+     * Validate a proposed schedule without persisting (advisory warnings + muscle frequency).
      */
     public function validateSchedule(SaveUserPlanRequest $request)
     {
@@ -117,9 +130,15 @@ class UserPlanController extends Controller
             (int) $validated['days_per_week']
         );
 
+        $muscleFrequency = $this->validatorService->computeWeeklyMuscleFrequency(
+            $split,
+            $validated['schedule']
+        );
+
         return response()->json([
             'status' => 'success',
             'warnings' => $warnings,
+            'muscle_frequency' => $muscleFrequency,
         ]);
     }
 }
