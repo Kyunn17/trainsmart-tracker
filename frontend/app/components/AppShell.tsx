@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Dumbbell,
+  Home,
   LogOut,
   LogIn,
   ShieldAlert,
@@ -73,6 +74,12 @@ export default function AppShell({ children }: AppShellProps) {
     navItems.push(
       {
         href: "/",
+        label: "Beranda",
+        icon: <Home className="w-4 h-4 shrink-0" />,
+        activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+      },
+      {
+        href: "/training",
         label: "Latihan",
         icon: <LayoutGrid className="w-4 h-4 shrink-0" />,
         activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
@@ -115,6 +122,9 @@ export default function AppShell({ children }: AppShellProps) {
 
   const isNavActive = (href: string) =>
     pathname === href ||
+    (href === "/training" &&
+      (pathname.startsWith("/session/") ||
+        pathname.startsWith("/onboarding"))) ||
     (href === "/exercises" && pathname === "/my-exercises");
 
   // Block protected routes immediately until authenticated (redirects guests to /)
