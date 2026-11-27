@@ -459,6 +459,45 @@ export async function getWorkoutHistory(): Promise<WorkoutLogEntry[]> {
 /* SPLIT RECOMMENDATIONS & GUIDE APIS                                        */
 /* ========================================================================= */
 
+export async function getAllSplits(filters?: {
+  days?: number;
+  recommendation_level?: 'recommended' | 'alternative' | 'not_recommended';
+}): Promise<{
+  success: boolean;
+  data: Split[];
+  message?: string;
+}> {
+  const params = new URLSearchParams();
+  if (filters?.days) params.set('days', String(filters.days));
+  if (filters?.recommendation_level) {
+    params.set('recommendation_level', filters.recommendation_level);
+  }
+  const qs = params.toString();
+  const url = qs ? `${API_BASE}/splits?${qs}` : `${API_BASE}/splits`;
+
+  try {
+    const res = await fetch(url, {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      return {
+        success: false,
+        data: [],
+        message: json.message || 'Gagal memuat katalog split.',
+      };
+    }
+    return {
+      success: true,
+      data: json.data || [],
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Koneksi ke backend gagal.';
+    return { success: false, data: [], message };
+  }
+}
+
 export async function getSplitRecommendations(days: number): Promise<{
   success: boolean;
   data: Split[];

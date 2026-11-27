@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Users,
   LayoutGrid,
+  Layers,
   BookOpen,
   BarChart3,
   Menu,
@@ -91,6 +92,12 @@ export default function AppShell({ children }: AppShellProps) {
         href: "/training",
         label: "Latihan",
         icon: <LayoutGrid className="w-4 h-4 shrink-0" />,
+        activeClass: "bg-[#FFF1EA] text-[#A83D0B] border-[#F4C4AC]",
+      },
+      {
+        href: "/splits",
+        label: "Split",
+        icon: <Layers className="w-4 h-4 shrink-0" />,
         activeClass: "bg-[#FFF1EA] text-[#A83D0B] border-[#F4C4AC]",
       },
       {

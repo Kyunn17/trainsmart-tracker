@@ -71,6 +71,7 @@ my-monorepo/
 | `POST` | `/api/login` | Login and issue Sanctum token |
 | `GET` | `/api/categories` / `/api/menu-latihan` | Legacy split categories with exercises |
 | `GET` | `/api/categories/{id}` | Single legacy category |
+| `GET` | `/api/splits` | Full active split catalog (18 splits across 2–6 days/week) with optional `days` & `recommendation_level` filters |
 | `GET` | `/api/splits/recommendations?days={2..6}` | All active split options for `days_per_week` ordered by `recommendation_level` (`recommended` first), with `sessions` and computed `muscle_frequency` |
 | `GET` | `/api/splits/{id}` | Split details + sessions + recommended exercises with images (`?all_exercises=1` for all) |
 | `GET` | `/api/exercises` | Paginated search/filter (`search`, `muscle`, `equipment`, `difficulty`, `beginner_only`, `session_type`, `per_page`) |
@@ -118,6 +119,7 @@ my-monorepo/
 ## 5. Frontend Routes & Components (`frontend/app/`)
 
 - `/` (`page.tsx` + `TodayDashboardSection.tsx`): Today's scheduled session card (Start Workout, Done, Skip, Trainer note, exercise preview with `"Cara"` modal, 7-day week strip) + legacy split cards & recent logs.
+- `/splits` (`splits/page.tsx` + `SplitAnatomyDiagram.tsx`): Dedicated Splits Guide Dashboard with day/level filters, session-by-session interactive Front/Back SVG muscle anatomy visual, computed weekly muscle frequency, pros/cons, and direct link to `/onboarding`.
 - `/onboarding` (`onboarding/page.tsx` + `ScheduleBuilder.tsx`): 4-step wizard (`1. Hari Latihan` -> `2. Pilih Split` grouped by `recommendation_level` with badges, computed muscle frequency, honest `not_recommended` explanations, and 2-split comparison -> `3. Daftar Gerakan` -> `4. Atur Jadwal` with `@dnd-kit` drag-and-drop, smart `"Gunakan Rekomendasi"`, live weekly muscle frequency summary, and data-driven advisory warnings).
 - `/session/[id]` (`session/[id]/page.tsx`): Launches `WorkoutPlanner` for a specific `DailySession`, showing exercise thumbnails and `"Cara"` detail modal while logging sets.
 - `/workout/[id]` (`workout/[id]/page.tsx`): Preserved legacy category workout session using `WorkoutPlanner`.

@@ -41,7 +41,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/exercises', [ExerciseController::class, 'index']);
     Route::get('/exercises/{idOrSlug}', [ExerciseController::class, 'show']);
 
-    // Split Recommendations & Details
+    // Split Catalog, Recommendations & Details
+    Route::get('/splits', [SplitController::class, 'index']);
     Route::get('/splits/recommendations', [SplitController::class, 'recommendations']);
     Route::get('/splits/{id}', [SplitController::class, 'show'])->whereNumber('id');
 

@@ -88,6 +88,25 @@ class SplitRecommendationTest extends TestCase
         $this->assertEquals(1, $bro5d['muscle_frequency']['quads']);
     }
 
+    public function test_splits_index_returns_full_catalog_and_supports_filters(): void
+    {
+        $this->seed(SplitSeeder::class);
+
+        $this->getJson('/api/splits')
+            ->assertStatus(200)
+            ->assertJsonPath('status', 'success')
+            ->assertJsonCount(18, 'data');
+
+        $this->getJson('/api/splits?days=4')
+            ->assertStatus(200)
+            ->assertJsonCount(4, 'data')
+            ->assertJsonPath('data.0.slug', 'upper-lower');
+
+        $this->getJson('/api/splits?recommendation_level=recommended')
+            ->assertStatus(200)
+            ->assertJsonCount(5, 'data');
+    }
+
     public function test_recommendations_validate_days_range(): void
     {
         $this->getJson('/api/splits/recommendations')->assertStatus(422);
