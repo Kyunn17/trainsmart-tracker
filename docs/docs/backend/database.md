@@ -51,3 +51,9 @@ erDiagram
 4. **`rir` (Reps In Reserve)**: Parameter kunci hipertrofi ilmiah (0 = Gagal Otot / Failure, 1 = 1 repetisi sebelum gagal, 2 = 2 repetisi sebelum gagal).
 5. **`rpe` (Rating of Perceived Exertion)**: Skala beban 6.0 – 10.0.
 6. **`notes`**: Catatan teknis individual untuk progressive overload (contoh: tempo 3-1-1, posisi lubang bangku #3, rasa stretch di dada bawah).
+
+## Katalog Split & Session Templates (Data-Driven)
+
+1. **`splits`**: Menyimpan 18 program latihan untuk frekuensi `days_per_week` (`2..6`), disertai `recommendation_level` (`recommended`, `alternative`, `not_recommended`), `pros`, `cons`, `suitable_for`, dan `not_recommended_reason`.
+2. **`split_sessions`**: Setiap sesi mendefinisikan `session_type` (13 template resmi: `full_body`, `upper`, `lower`, `push`, `pull`, `legs`, `anterior`, `posterior`, `arms_delts`, `chest`, `back`, `shoulders`, `arms`), `muscle_groups`, `muscle_regions`, `is_heavy`, `default_day_of_week`, dan `sort_order`.
+3. **`CuratedExerciseSeeder`**: Memetakan 53 gerakan resmi ke `split_sessions` secara otomatis melalui kecocokan `muscle_region` sehingga penambahan sesi baru tidak memerlukan duplikasi daftar gerakan manual.

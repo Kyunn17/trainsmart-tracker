@@ -44,9 +44,15 @@ my-monorepo/
 - **`categories`**: `id`, `name` (legacy Push/Pull/Legs splits, preserved).
 - **`exercises`**: `id`, `category_id` (nullable FK), `user_id` (nullable FK → `users`, `null` = official library), `name`, `slug` (unique), `primary_muscle`, `muscle_region` (`upper_chest`, `middle_chest`, `lower_chest`, `front_delt`, `lateral_delt`, `rear_delt`, `triceps`, `lats`, `mid_back`, `biceps`, `quads`, `hamstrings`, `glutes`, `calves`, `core`), `secondary_muscles` (json), `equipment`, `movement_pattern`, `difficulty`, `is_beginner_friendly` (bool), `instructions` (json), `common_mistakes` (json), `tips` (json), `video_url`, `is_active` (bool), `is_custom` (bool), `approval_status` (`pending|approved|rejected`), `rejection_reason`, `source` (`curated|user_custom`), `deleted_at` (`SoftDeletes`). Enforced by `ExercisePolicy`.
 - **`exercise_images`**: `id`, `exercise_id` (FK), `path` (relative path in `storage/app/public`, e.g. `exercises/{slug}/0.jpg`), `position` (`0` = start, `1` = end), `alt_text`. Model appends `url`.
-- **`splits`**: `id`, `slug` (unique), `name`, `description`, `min_days`, `max_days`, `pros` (json), `cons` (json), `suitable_for`, `is_active`, `sort_order`.
-  - Seeded by `SplitSeeder`: `full-body` (2–3 days), `upper-lower` (4 days), `ppl-ul` (5 days), `ppl-ap` (5 days), `ppl-2x` (6 days).
-- **`split_sessions`**: `id`, `split_id` (FK), `slug`, `name`, `session_type`, `muscle_groups` (json), `default_day_of_week` (1–7), `sort_order`.
+- **`splits`**: `id`, `slug` (unique), `name`, `description`, `days_per_week` (`2..6`, indexed), `recommendation_level` (`recommended|alternative|not_recommended`), `min_days`, `max_days`, `pros` (json), `cons` (json), `suitable_for`, `not_recommended_reason` (nullable text), `is_active`, `sort_order`. Appends computed `muscle_frequency` (map of 10 major muscle groups to weekly counts).
+  - Seeded idempotently by `SplitSeeder` (18 splits across 2–6 days/week, safely migrating legacy 2-day `full-body` `user_plans` to `full-body-2d`):
+    - **2 days:** `full-body-2d` (recommended), `upper-lower-2d` (alternative)
+    - **3 days:** `full-body` (recommended), `ul-fb-3d`, `ap-fb-3d`, `ppl-3d` (alternatives)
+    - **4 days:** `upper-lower` (recommended), `anterior-posterior-4d`, `ppl-fb-4d` (alternatives), `bro-split-4d` (not_recommended)
+    - **5 days:** `ppl-ul` (recommended), `ppl-ap`, `ul-ul-arms-5d` (alternatives), `bro-split-5d` (not_recommended)
+    - **6 days:** `ppl-2x` (recommended), `upper-lower-6d`, `anterior-posterior-6d` (alternatives), `bro-split-6d` (not_recommended)
+- **`split_sessions`**: `id`, `split_id` (FK), `slug`, `name`, `session_type`, `muscle_groups` (json), `muscle_regions` (json, used by `CuratedExerciseSeeder` for automatic exercise-to-session mapping), `is_heavy` (bool), `default_day_of_week` (1–7), `sort_order`.
+  - Canonical 13 session templates defined in `SplitSession::TEMPLATES`: `full_body`, `upper`, `lower`, `push`, `pull`, `legs`, `anterior`, `posterior`, `arms_delts`, `chest`, `back`, `shoulders`, `arms`.
 - **`exercise_split_session`**: pivot linking `split_session_id` ↔ `exercise_id` with `is_default_recommended`, `default_sets`, `default_rep_range`, `sort_order`.
 - **`user_plans`**: `id`, `user_id` (FK), `split_id` (FK), `days_per_week`, `is_active`, `onboarding_completed_at`.
 - **`plan_schedules`**: `id`, `user_plan_id` (FK), `day_of_week` (`1`=Mon..`7`=Sun), `split_session_id` (nullable FK; `null` = Rest Day).
@@ -65,7 +71,7 @@ my-monorepo/
 | `POST` | `/api/login` | Login and issue Sanctum token |
 | `GET` | `/api/categories` / `/api/menu-latihan` | Legacy split categories with exercises |
 | `GET` | `/api/categories/{id}` | Single legacy category |
-| `GET` | `/api/splits/recommendations?days={2..6}` | Split recommendations (FormRequest validated `2..6`) |
+| `GET` | `/api/splits/recommendations?days={2..6}` | All active split options for `days_per_week` ordered by `recommendation_level` (`recommended` first), with `sessions` and computed `muscle_frequency` |
 | `GET` | `/api/splits/{id}` | Split details + sessions + recommended exercises with images (`?all_exercises=1` for all) |
 | `GET` | `/api/exercises` | Paginated search/filter (`search`, `muscle`, `equipment`, `difficulty`, `beginner_only`, `session_type`, `per_page`) |
 | `GET` | `/api/exercises/{idOrSlug}` | Full exercise guide, images, and mapped split sessions |
@@ -78,9 +84,9 @@ my-monorepo/
 |---|---|---|---|
 | `GET` | `/api/me` / `/api/user` | Any | Current user profile |
 | `POST` | `/api/logout` | Any | Revoke current token |
-| `GET` | `/api/user/plan` | Any | Active `UserPlan`, 7-day `schedules`, and advisory `warnings` |
-| `POST` | `/api/user/plan` | Any | Save active plan + 7-day schedule (returns `201` + advisory `warnings`) |
-| `POST` | `/api/user/plan/validate-schedule` | Any | Dry-run schedule advisory validation |
+| `GET` | `/api/user/plan` | Any | Active `UserPlan`, 7-day `schedules`, advisory `warnings`, and computed `muscle_frequency` |
+| `POST` | `/api/user/plan` | Any | Save active plan + 7-day schedule (returns `201` + advisory `warnings` + `muscle_frequency`) |
+| `POST` | `/api/user/plan/validate-schedule` | Any | Dry-run data-driven schedule advisory validation (`no_rest_day`, `days_count_mismatch`, `no_lower_body_session`, `no_chest_session`, `no_back_session`, region-aware `consecutive_muscle_overlap`) |
 | `GET` | `/api/daily-sessions/today` | Any | Materialize/fetch today's session + 7-day `week_overview` |
 | `GET` | `/api/daily-sessions/{id}` | Owner | Single daily session with exercises & images |
 | `PATCH` | `/api/daily-sessions/{id}/status` | Owner | Update status (`409` if overridden by trainer) |
@@ -112,7 +118,7 @@ my-monorepo/
 ## 5. Frontend Routes & Components (`frontend/app/`)
 
 - `/` (`page.tsx` + `TodayDashboardSection.tsx`): Today's scheduled session card (Start Workout, Done, Skip, Trainer note, exercise preview with `"Cara"` modal, 7-day week strip) + legacy split cards & recent logs.
-- `/onboarding` (`onboarding/page.tsx` + `ScheduleBuilder.tsx`): 4-step wizard (`1. Hari Latihan` -> `2. Pilih Split` -> `3. Daftar Gerakan` -> `4. Atur Jadwal` with `@dnd-kit` drag-and-drop, `"Gunakan Rekomendasi"`, and live advisory warnings).
+- `/onboarding` (`onboarding/page.tsx` + `ScheduleBuilder.tsx`): 4-step wizard (`1. Hari Latihan` -> `2. Pilih Split` grouped by `recommendation_level` with badges, computed muscle frequency, honest `not_recommended` explanations, and 2-split comparison -> `3. Daftar Gerakan` -> `4. Atur Jadwal` with `@dnd-kit` drag-and-drop, smart `"Gunakan Rekomendasi"`, live weekly muscle frequency summary, and data-driven advisory warnings).
 - `/session/[id]` (`session/[id]/page.tsx`): Launches `WorkoutPlanner` for a specific `DailySession`, showing exercise thumbnails and `"Cara"` detail modal while logging sets.
 - `/workout/[id]` (`workout/[id]/page.tsx`): Preserved legacy category workout session using `WorkoutPlanner`.
 - `/exercises` (`exercises/page.tsx`): Searchable, filterable Exercise Library (`muscle`, `muscle_region`, `equipment`, `difficulty`, `scope`, `beginner_only`) with `ExerciseThumbnail`, `ExerciseDetailModal`, `"Custom"` badges, and `"Ajukan Gerakan Custom"` modal (`CustomExerciseModal`).

@@ -35,6 +35,10 @@ TrainSmart membagi hak akses ke dalam 3 peran:
 ### 3. Client / Member (`client`)
 * Menjalankan program latihan hipertrofi dan memilih Personal Trainer.
 * **Endpoints**:
+  * `GET /api/splits/recommendations?days={2..6}` : Mengembalikan seluruh opsi split (18 katalog total) untuk frekuensi hari terpilih, terurut berdasarkan `recommendation_level` (`recommended`, `alternative`, `not_recommended`), lengkap dengan sesi berurutan dan `muscle_frequency` per otot.
+  * `GET /api/splits/{id}` : Detail split, daftar sesi template, dan daftar gerakan terkurasi berbasis `muscle_region`.
+  * `GET /api/user/plan` & `POST /api/user/plan` : Mengambil atau menyimpan program & jadwal mingguan beserta *advisory warnings* dan `muscle_frequency`.
+  * `POST /api/user/plan/validate-schedule` : Validasi jadwal *dry-run* berbasis template sesi (`no_lower_body_session`, `no_chest_session`, `no_back_session`, `no_rest_day`, serta `consecutive_muscle_overlap` sadar sub-region bahu).
   * `GET /api/trainers` : Melihat daftar seluruh Personal Trainer bersertifikasi beserta keahliannya.
   * `POST /api/client/select-trainer` : Memilih atau mengganti Personal Trainer.
   * `GET /api/client/my-progress` : Melihat riwayat progres beban dan tonase pribadi.

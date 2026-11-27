@@ -576,6 +576,7 @@ export async function getUserPlan(): Promise<{
   success: boolean;
   data: UserPlan | null;
   warnings: ScheduleWarning[];
+  muscle_frequency?: Record<string, number>;
   message?: string;
 }> {
   try {
@@ -596,6 +597,7 @@ export async function getUserPlan(): Promise<{
       success: true,
       data: json.data || null,
       warnings: json.warnings || [],
+      muscle_frequency: json.muscle_frequency || {},
     };
   } catch (err: unknown) {
     const message =
@@ -609,6 +611,7 @@ export async function saveUserPlan(payload: SaveUserPlanPayload): Promise<{
   message: string;
   data?: UserPlan;
   warnings: ScheduleWarning[];
+  muscle_frequency?: Record<string, number>;
 }> {
   try {
     const res = await fetch(`${API_BASE}/user/plan`, {
@@ -629,6 +632,7 @@ export async function saveUserPlan(payload: SaveUserPlanPayload): Promise<{
       message: json.message || 'Rencana latihan berhasil disimpan.',
       data: json.data,
       warnings: json.warnings || [],
+      muscle_frequency: json.muscle_frequency || {},
     };
   } catch (err: unknown) {
     const message =
@@ -639,18 +643,21 @@ export async function saveUserPlan(payload: SaveUserPlanPayload): Promise<{
 
 export async function validateUserSchedule(
   payload: SaveUserPlanPayload
-): Promise<ScheduleWarning[]> {
+): Promise<{ warnings: ScheduleWarning[]; muscle_frequency: Record<string, number> }> {
   try {
     const res = await fetch(`${API_BASE}/user/plan/validate-schedule`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
     });
-    if (!res.ok) return [];
+    if (!res.ok) return { warnings: [], muscle_frequency: {} };
     const json = await res.json();
-    return json.warnings || [];
+    return {
+      warnings: json.warnings || [],
+      muscle_frequency: json.muscle_frequency || {},
+    };
   } catch {
-    return [];
+    return { warnings: [], muscle_frequency: {} };
   }
 }
 

@@ -69,6 +69,11 @@ const SESSION_TYPE_OPTIONS = [
   { value: "full_body", label: "Full Body" },
   { value: "anterior", label: "Anterior" },
   { value: "posterior", label: "Posterior" },
+  { value: "arms_delts", label: "Arms & Delts" },
+  { value: "chest", label: "Chest" },
+  { value: "back", label: "Back" },
+  { value: "shoulders", label: "Shoulders" },
+  { value: "arms", label: "Arms" },
 ];
 
 interface CustomExerciseModalProps {

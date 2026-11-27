@@ -71,6 +71,8 @@ export interface Exercise {
   notes?: string;
 }
 
+export type RecommendationLevel = "recommended" | "alternative" | "not_recommended";
+
 export interface SplitSession {
   id: number;
   split_id: number;
@@ -78,6 +80,8 @@ export interface SplitSession {
   name: string;
   session_type: string;
   muscle_groups: string[];
+  muscle_regions?: string[] | null;
+  is_heavy?: boolean;
   default_day_of_week?: number | null;
   sort_order: number;
   exercises?: Exercise[];
@@ -88,11 +92,15 @@ export interface Split {
   slug: string;
   name: string;
   description: string;
+  days_per_week?: number;
+  recommendation_level?: RecommendationLevel;
   min_days: number;
   max_days: number;
   pros: string[];
   cons: string[];
   suitable_for: string;
+  not_recommended_reason?: string | null;
+  muscle_frequency?: Record<string, number>;
   is_active: boolean;
   sort_order: number;
   sessions?: SplitSession[];

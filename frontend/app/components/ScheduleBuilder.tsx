@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  Activity,
   AlertTriangle,
   CheckCircle2,
   GripVertical,
@@ -28,9 +29,11 @@ import {
 import { Split, SplitSession, ScheduleWarning } from "@/types/workout";
 import { saveUserPlan } from "@/lib/api";
 import {
-  WEEKDAYS,
+  MAJOR_MUSCLE_KEYS,
   MUSCLE_LABELS,
+  WEEKDAYS,
   buildRecommendedSchedule,
+  computeScheduleMuscleFrequency,
   validateScheduleLocally,
 } from "@/lib/scheduleValidation";
 
@@ -51,6 +54,11 @@ const SESSION_BADGE_COLORS: Record<string, string> = {
   anterior: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
   posterior: "bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]",
   full_body: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
+  arms_delts: "bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]",
+  chest: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+  back: "bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]",
+  shoulders: "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]",
+  arms: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
 };
 
 function DraggablePoolSession({
@@ -161,7 +169,7 @@ function DraggableDayBadge({
       <button
         type="button"
         onClick={onClear}
-        className="w-9 h-9 rounded-lg text-[#626E67] hover:text-[#BE123C] hover:bg-[#FFF1F2] flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+        className="w-11 h-11 rounded-lg text-[#626E67] hover:text-[#BE123C] hover:bg-[#FFF1F2] flex items-center justify-center transition-colors shrink-0 cursor-pointer"
         aria-label={`Jadikan hari istirahat`}
         title="Kosongkan menjadi hari istirahat"
       >
@@ -196,7 +204,7 @@ function DroppableDayCard({
   return (
     <div
       ref={setNodeRef}
-      className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 min-h-[144px] ${
+      className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 min-h-[156px] ${
         isOver
           ? "bg-[#FFF1EA] border-[#C84B11] ring-2 ring-[#C84B11]/25"
           : hasWarning
@@ -227,14 +235,14 @@ function DroppableDayCard({
         </div>
       )}
 
-      {/* Accessible keyboard & mobile 1-tap selector */}
+      {/* Accessible keyboard & mobile 1-tap selector (44px touch target) */}
       <select
         aria-label={`Pilih sesi untuk hari ${label}`}
         value={session?.id ?? ""}
         onChange={(e) =>
           onSelectSession(e.target.value ? Number(e.target.value) : null)
         }
-        className="w-full h-10 px-2.5 bg-white border border-[#C5CCC0] rounded-xl text-xs font-medium text-[#141916] outline-none focus:border-[#C84B11]"
+        className="w-full h-11 px-3 bg-white border border-[#C5CCC0] rounded-xl text-xs sm:text-sm font-medium text-[#141916] outline-none focus:border-[#C84B11]"
       >
         <option value="">Hari Istirahat</option>
         {allSessions.map((s) => (
@@ -254,7 +262,10 @@ export default function ScheduleBuilder({
   onSaved,
   onBack,
 }: ScheduleBuilderProps) {
-  const sessions = useMemo(() => split.sessions || [], [split.sessions]);
+  const sessions = useMemo(
+    () => [...(split.sessions || [])].sort((a, b) => a.sort_order - b.sort_order),
+    [split.sessions]
+  );
 
   const [dayMap, setDayMap] = useState<Record<number, number | null>>(() => {
     if (initialSchedule) return initialSchedule;
@@ -284,6 +295,11 @@ export default function ScheduleBuilder({
   const warnings = useMemo(
     () => validateScheduleLocally(sessions, dayMap, daysPerWeek),
     [sessions, dayMap, daysPerWeek]
+  );
+
+  const weeklyMuscleFrequency = useMemo(
+    () => computeScheduleMuscleFrequency(sessions, dayMap),
+    [sessions, dayMap]
   );
 
   const warningDaysSet = useMemo(() => {
@@ -405,7 +421,8 @@ export default function ScheduleBuilder({
             Susun Jadwal Mingguan ({split.name})
           </h2>
           <p className="text-xs sm:text-sm text-[#48524C]">
-            Tarik sesi latihan ke hari Senin–Minggu, atau pilih langsung melalui menu di tiap hari.
+            Tarik sesi latihan ke hari Senin–Minggu, atau pilih langsung melalui
+            menu di tiap hari.
           </p>
         </div>
 
@@ -429,7 +446,45 @@ export default function ScheduleBuilder({
         </div>
       </div>
 
-      {/* Advisory Warnings Panel */}
+      {/* Live Weekly Muscle Frequency Summary */}
+      <div className="bg-white border border-[#DCE1D8] rounded-2xl p-4 shadow-xs space-y-2.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-xs sm:text-sm font-bold text-[#141916] flex items-center gap-2">
+            <Activity className="w-4 h-4 text-[#C84B11]" />
+            <span>Ringkasan Frekuensi Otot Mingguan</span>
+          </span>
+          <span className="text-xs text-[#626E67]">
+            Target optimal pemula: ≥ 2×/minggu per otot
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {MAJOR_MUSCLE_KEYS.map((muscle) => {
+            const count = weeklyMuscleFrequency[muscle] || 0;
+            const pillClass =
+              count >= 2
+                ? "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]"
+                : count === 1
+                ? "bg-[#F5F6F3] text-[#141916] border-[#DCE1D8]"
+                : "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]";
+
+            return (
+              <div
+                key={muscle}
+                className={`px-3 py-2 rounded-xl border flex items-center justify-between text-xs ${pillClass}`}
+              >
+                <span className="font-medium truncate">
+                  {MUSCLE_LABELS[muscle] || muscle}
+                </span>
+                <span className="font-mono tabular-nums font-bold ml-1.5">
+                  {count}×
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Advisory Warnings Panel (never blocks saving) */}
       {warnings.length > 0 ? (
         <div
           role="status"
@@ -438,7 +493,7 @@ export default function ScheduleBuilder({
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-bold text-[#B45309] flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>Catatan Pemulihan & Jadwal (Saran)</span>
+              <span>Catatan Pemulihan & Keseimbangan Jadwal (Saran)</span>
             </span>
             <span className="text-xs font-medium text-[#B45309]">
               Tetap dapat disimpan
@@ -461,7 +516,8 @@ export default function ScheduleBuilder({
         <div className="p-3.5 bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl text-xs sm:text-sm text-[#047857] font-medium flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>
-            Jadwal terlihat seimbang — tidak ada tumpang tindih otot berturut-turut dan waktu pemulihan terjaga.
+            Jadwal terlihat seimbang — seluruh kelompok otot utama tercakup,
+            tidak ada bentrok hari berturut-turut, dan waktu pemulihan terjaga.
           </span>
         </div>
       )}
@@ -560,7 +616,9 @@ export default function ScheduleBuilder({
           className="w-full sm:w-auto h-12 px-7 bg-[#C84B11] hover:bg-[#A83D0B] disabled:opacity-50 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
         >
           <Save className="w-4 h-4" />
-          <span>{isSaving ? "Menyimpan Jadwal..." : "Simpan Jadwal Latihan"}</span>
+          <span>
+            {isSaving ? "Menyimpan Jadwal..." : "Simpan Jadwal Latihan"}
+          </span>
         </button>
       </div>
     </div>
