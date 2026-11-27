@@ -108,13 +108,13 @@ export default function RegisterPage() {
         <div className="my-auto w-full max-w-lg mx-auto py-6">
           <div className="mb-6">
             <div className="inline-flex items-center gap-2.5 mb-4">
-              <div className="w-10 h-10 bg-[#ECEFE9] rounded-xl flex items-center justify-center p-1.5 border border-[#DCE1D8] shadow-xs">
+              <div className="w-11 h-11 rounded-xl overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
                 <Image
                   src="/icon.png"
                   alt="TrainSmart"
-                  width={32}
-                  height={32}
-                  className="w-full h-full object-contain"
+                  width={44}
+                  height={44}
+                  className="w-full h-full object-cover rounded-xl"
                   priority
                 />
               </div>

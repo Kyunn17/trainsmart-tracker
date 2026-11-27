@@ -171,13 +171,13 @@ export default function AppShell({ children }: AppShellProps) {
         >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center gap-3 group shrink-0">
-              <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/10 backdrop-blur-xs flex items-center justify-center p-1 border border-white/20 shadow-xs group-hover:scale-105 transition-transform">
+              <div className="w-10 h-10 rounded-xl overflow-hidden shadow-xs group-hover:scale-105 transition-transform shrink-0 flex items-center justify-center">
                 <Image
                   src="/icon.png"
                   alt="TrainSmart"
-                  width={36}
-                  height={36}
-                  className="w-full h-full object-contain"
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-cover rounded-xl"
                   priority
                 />
               </div>
@@ -246,13 +246,13 @@ export default function AppShell({ children }: AppShellProps) {
             onClick={onNavigate}
             className="flex items-center gap-3 group min-w-0"
           >
-            <div className="w-9 h-9 rounded-xl overflow-hidden bg-[#ECEFE9] flex items-center justify-center p-1 border border-[#DCE1D8] shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-xs shrink-0 group-hover:scale-105 transition-transform flex items-center justify-center">
               <Image
                 src="/icon.png"
                 alt="TrainSmart"
-                width={32}
-                height={32}
-                className="w-full h-full object-contain"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover rounded-xl"
                 priority
               />
             </div>
@@ -359,13 +359,13 @@ export default function AppShell({ children }: AppShellProps) {
             <Menu className="w-5 h-5" />
           </button>
           <Link href="/" className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-lg overflow-hidden bg-[#ECEFE9] flex items-center justify-center p-1 border border-[#DCE1D8] shrink-0">
+            <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 flex items-center justify-center shadow-xs">
               <Image
                 src="/icon.png"
                 alt="TrainSmart"
-                width={28}
-                height={28}
-                className="w-full h-full object-contain"
+                width={36}
+                height={36}
+                className="w-full h-full object-cover rounded-lg"
                 priority
               />
             </div>
