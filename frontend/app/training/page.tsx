@@ -22,14 +22,17 @@ export default function TrainingDashboardPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            <span className="px-3.5 py-2 bg-white border border-[#DCE1D8] rounded-xl text-xs font-semibold text-[#141916] flex items-center gap-2 shadow-xs">
-              <Zap className="w-4 h-4 text-[#C84B11]" />
-              <span>Target 1–2 RIR</span>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-semibold text-[#48524C] shrink-0">
+            <span className="inline-flex items-center gap-1.5">
+              <Zap className="w-4 h-4 text-[#A83D0B]" />
+              <span>Target 1–2 RIR (sisa 1–2 rep)</span>
             </span>
-            <span className="px-3.5 py-2 bg-white border border-[#DCE1D8] rounded-xl text-xs font-semibold text-[#141916] flex items-center gap-2 shadow-xs">
+            <span className="text-[#8E9891]" aria-hidden="true">
+              ·
+            </span>
+            <span className="inline-flex items-center gap-1.5">
               <ShieldCheck className="w-4 h-4 text-[#047857]" />
-              <span>Full Range of Motion</span>
+              <span>Gerakan Penuh (Full ROM)</span>
             </span>
           </div>
         </section>

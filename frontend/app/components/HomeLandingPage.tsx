@@ -367,8 +367,16 @@ export default function HomeLandingPage() {
         </div>
 
         <footer className="mt-10 pt-6 border-t border-[#DCE1D8] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#626E67]">
-          <div className="flex items-center gap-2 font-semibold text-[#141916]">
-            <Dumbbell className="w-4 h-4 text-[#C84B11]" />
+          <div className="flex items-center gap-2.5 font-semibold text-[#141916]">
+            <div className="w-6 h-6 rounded-md overflow-hidden bg-[#ECEFE9] border border-[#DCE1D8] flex items-center justify-center p-0.5 shrink-0">
+              <Image
+                src="/icon.png"
+                alt="TrainSmart"
+                width={20}
+                height={20}
+                className="w-full h-full object-contain"
+              />
+            </div>
             <span>TrainSmart</span>
           </div>
           <p>Panduan Latihan Gym & Pencatat Hipertrofi Indonesia.</p>

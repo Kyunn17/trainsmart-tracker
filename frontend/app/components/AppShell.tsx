@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Dumbbell,
   Home,
   LogOut,
   LogIn,
@@ -39,6 +39,15 @@ export default function AppShell({ children }: AppShellProps) {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsMobileOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobileOpen]);
 
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
   const isAuthPage = pathname === "/login" || pathname === "/register";
@@ -76,19 +85,19 @@ export default function AppShell({ children }: AppShellProps) {
         href: "/",
         label: "Beranda",
         icon: <Home className="w-4 h-4 shrink-0" />,
-        activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+        activeClass: "bg-[#FFF1EA] text-[#A83D0B] border-[#F4C4AC]",
       },
       {
         href: "/training",
         label: "Latihan",
         icon: <LayoutGrid className="w-4 h-4 shrink-0" />,
-        activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+        activeClass: "bg-[#FFF1EA] text-[#A83D0B] border-[#F4C4AC]",
       },
       {
         href: "/exercises",
         label: "Gerakan",
         icon: <BookOpen className="w-4 h-4 shrink-0" />,
-        activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+        activeClass: "bg-[#FFF1EA] text-[#A83D0B] border-[#F4C4AC]",
       }
     );
 
@@ -97,7 +106,7 @@ export default function AppShell({ children }: AppShellProps) {
         href: "/evaluation",
         label: "Evaluasi",
         icon: <BarChart3 className="w-4 h-4 shrink-0" />,
-        activeClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
+        activeClass: "bg-[#FFF1EA] text-[#A83D0B] border-[#F4C4AC]",
       });
     }
 
@@ -162,8 +171,15 @@ export default function AppShell({ children }: AppShellProps) {
         >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center gap-3 group shrink-0">
-              <div className="w-10 h-10 rounded-xl bg-[#C84B11] group-hover:bg-[#A83D0B] flex items-center justify-center text-white transition-colors shadow-xs">
-                <Dumbbell className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/10 backdrop-blur-xs flex items-center justify-center p-1 border border-white/20 shadow-xs group-hover:scale-105 transition-transform">
+                <Image
+                  src="/icon.png"
+                  alt="TrainSmart"
+                  width={36}
+                  height={36}
+                  className="w-full h-full object-contain"
+                  priority
+                />
               </div>
               <div className="flex flex-col">
                 <span
@@ -184,15 +200,15 @@ export default function AppShell({ children }: AppShellProps) {
             </Link>
 
             {!user && (
-              <div className="flex items-center gap-2">
+              <nav aria-label="Navigasi pengunjung" className="flex items-center gap-2">
                 <Link
                   href="/login"
-                  className={`h-10 px-4 rounded-xl text-sm font-semibold flex items-center gap-1.5 border transition-all whitespace-nowrap ${
+                  className={`h-11 px-4 rounded-xl text-sm font-semibold flex items-center gap-1.5 border transition-all whitespace-nowrap ${
                     isHome
                       ? "bg-white/10 hover:bg-white/20 border-white/25 text-white backdrop-blur-sm"
                       : pathname === "/login"
-                      ? "bg-[#ECEFE9] border-[#C5CCC0] text-[#141916]"
-                      : "bg-white hover:bg-[#ECEFE9] border-[#C5CCC0] text-[#141916]"
+                      ? "bg-[#ECEFE9] border-[#8E9891] text-[#141916]"
+                      : "bg-white hover:bg-[#ECEFE9] border-[#8E9891] text-[#141916]"
                   }`}
                 >
                   <LogIn
@@ -204,11 +220,11 @@ export default function AppShell({ children }: AppShellProps) {
                 </Link>
                 <Link
                   href="/register"
-                  className="h-10 px-4 bg-[#C84B11] hover:bg-[#A83D0B] text-white rounded-xl text-sm font-semibold flex items-center transition-colors shadow-xs whitespace-nowrap"
+                  className="h-11 px-4 bg-[#C84B11] hover:bg-[#A83D0B] text-white rounded-xl text-sm font-semibold flex items-center transition-colors shadow-xs whitespace-nowrap"
                 >
                   Daftar
                 </Link>
-              </div>
+              </nav>
             )}
           </div>
         </header>
@@ -230,8 +246,15 @@ export default function AppShell({ children }: AppShellProps) {
             onClick={onNavigate}
             className="flex items-center gap-3 group min-w-0"
           >
-            <div className="w-9 h-9 rounded-xl bg-[#C84B11] group-hover:bg-[#A83D0B] flex items-center justify-center text-white transition-colors shadow-xs shrink-0">
-              <Dumbbell className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden bg-[#ECEFE9] flex items-center justify-center p-1 border border-[#DCE1D8] shadow-xs shrink-0 group-hover:scale-105 transition-transform">
+              <Image
+                src="/icon.png"
+                alt="TrainSmart"
+                width={32}
+                height={32}
+                className="w-full h-full object-contain"
+                priority
+              />
             </div>
             <div className="flex flex-col min-w-0">
               <span className="font-bold text-base tracking-tight text-[#141916] leading-tight truncate">
@@ -247,7 +270,7 @@ export default function AppShell({ children }: AppShellProps) {
             <button
               type="button"
               onClick={onNavigate}
-              className="lg:hidden h-9 w-9 rounded-xl bg-[#ECEFE9] text-[#48524C] flex items-center justify-center cursor-pointer"
+              className="lg:hidden h-11 w-11 rounded-xl bg-[#ECEFE9] text-[#48524C] flex items-center justify-center cursor-pointer"
               aria-label="Tutup menu navigasi"
             >
               <X className="w-4 h-4" />
@@ -336,8 +359,15 @@ export default function AppShell({ children }: AppShellProps) {
             <Menu className="w-5 h-5" />
           </button>
           <Link href="/" className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-[#C84B11] flex items-center justify-center text-white shrink-0">
-              <Dumbbell className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden bg-[#ECEFE9] flex items-center justify-center p-1 border border-[#DCE1D8] shrink-0">
+              <Image
+                src="/icon.png"
+                alt="TrainSmart"
+                width={28}
+                height={28}
+                className="w-full h-full object-contain"
+                priority
+              />
             </div>
             <span className="font-bold text-sm text-[#141916] truncate">
               TrainSmart
@@ -374,7 +404,47 @@ export default function AppShell({ children }: AppShellProps) {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 min-w-0 flex flex-col">{children}</div>
+      <div className="flex-1 min-w-0 flex flex-col pb-20 lg:pb-0">
+        {children}
+      </div>
+
+      {/* Mobile Thumb-Zone Bottom Navigation Bar */}
+      <nav
+        aria-label="Navigasi bawah mobile"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#DCE1D8] px-2"
+      >
+        <div
+          className="grid gap-1 max-w-lg mx-auto"
+          style={{
+            gridTemplateColumns: `repeat(${Math.max(1, navItems.length)}, minmax(0, 1fr))`,
+          }}
+        >
+          {navItems.map((item) => {
+            const active = isNavActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`min-h-[56px] py-1.5 px-1 flex flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                  active
+                    ? "text-[#A83D0B]"
+                    : "text-[#48524C] hover:text-[#141916]"
+                }`}
+              >
+                <span
+                  className={`px-3 py-1 rounded-full transition-colors ${
+                    active ? "bg-[#FFF1EA]" : ""
+                  }`}
+                >
+                  {item.icon}
+                </span>
+                <span className="truncate max-w-full">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

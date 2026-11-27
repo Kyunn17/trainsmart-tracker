@@ -5,13 +5,14 @@
   --bg-surface: #FFFFFF;
   --bg-subtle: #ECEFE9;
   --border-default: #DCE1D8;
-  --border-strong: #C5CCC0;
+  --border-strong: #8E9891;
   --text-primary: #141916;
   --text-secondary: #48524C;
   --text-muted: #626E67;
 
   --accent-primary: #C84B11;
   --accent-primary-hover: #A83D0B;
+  --accent-text: #A83D0B;
   --accent-primary-soft: #FFF1EA;
   --accent-primary-border: #F4C4AC;
 
@@ -46,16 +47,28 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
   --color-accent: var(--accent-primary);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 body {
   background: var(--bg-canvas);
   color: var(--text-primary);
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
-  overflow-x: hidden;
+  overflow-x: clip;
   caret-color: var(--accent-primary);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), var(--font-sans), sans-serif;
+}
+
+h1,
+h2 {
+  letter-spacing: -0.02em;
 }
 
 ::selection {

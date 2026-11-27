@@ -5,12 +5,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  Dumbbell,
   Lock,
   Mail,
   ArrowLeft,
   ArrowRight,
   AlertCircle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -20,6 +21,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -65,7 +67,7 @@ export default function LoginPage() {
         <div>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-[#48524C] hover:text-[#141916] px-3.5 py-2 rounded-xl border border-[#DCE1D8] bg-[#F5F6F3] hover:bg-[#ECEFE9] transition-colors w-fit"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#48524C] hover:text-[#141916] min-h-[44px] px-4 rounded-xl border border-[#DCE1D8] bg-[#F5F6F3] hover:bg-[#ECEFE9] transition-colors w-fit"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Kembali ke Beranda</span>
@@ -75,8 +77,15 @@ export default function LoginPage() {
         <div className="my-auto w-full max-w-md mx-auto py-8">
           <div className="mb-7">
             <div className="inline-flex items-center gap-2.5 mb-5">
-              <div className="w-10 h-10 bg-[#C84B11] rounded-xl flex items-center justify-center text-white shadow-xs">
-                <Dumbbell className="w-5 h-5" />
+              <div className="w-10 h-10 bg-[#ECEFE9] rounded-xl flex items-center justify-center p-1.5 border border-[#DCE1D8] shadow-xs">
+                <Image
+                  src="/icon.png"
+                  alt="TrainSmart"
+                  width={32}
+                  height={32}
+                  className="w-full h-full object-contain"
+                  priority
+                />
               </div>
               <span className="font-bold text-lg tracking-tight text-[#141916]">
                 TrainSmart
@@ -118,7 +127,7 @@ export default function LoginPage() {
                   placeholder="nama@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-11 pl-10 pr-4 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#C84B11] transition-colors"
+                  className="w-full h-11 pl-10 pr-4 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] focus:border-[#C84B11] transition-colors"
                   required
                 />
               </div>
@@ -135,14 +144,30 @@ export default function LoginPage() {
                 <Lock className="w-4 h-4 text-[#626E67] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="login-password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   placeholder="Masukkan kata sandi"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full h-11 pl-10 pr-4 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#C84B11] transition-colors"
+                  className="w-full h-11 pl-10 pr-12 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] focus:border-[#C84B11] transition-colors"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-0 top-0 h-11 w-11 flex items-center justify-center text-[#48524C] hover:text-[#141916] rounded-r-xl cursor-pointer"
+                  aria-label={
+                    showPassword
+                      ? "Sembunyikan kata sandi"
+                      : "Tampilkan kata sandi"
+                  }
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -160,7 +185,7 @@ export default function LoginPage() {
             Belum punya akun?{" "}
             <Link
               href="/register"
-              className="text-[#C84B11] font-semibold hover:underline"
+              className="text-[#A83D0B] font-semibold hover:underline"
             >
               Daftar Sekarang
             </Link>
@@ -187,9 +212,6 @@ export default function LoginPage() {
           aria-hidden="true"
         />
         <div className="absolute bottom-10 left-10 right-10 z-10 max-w-md space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#F4C4AC]">
-            Konsistensi Terukur
-          </p>
           <h2 className="text-2xl font-bold text-white leading-snug">
             Lanjutkan progres set, beban, dan RIR Anda hari ini.
           </h2>

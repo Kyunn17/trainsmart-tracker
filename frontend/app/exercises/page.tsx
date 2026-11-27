@@ -256,7 +256,7 @@ export default function ExercisesPage() {
                 placeholder="Cari gerakan (misal: Bench Press, Squat)..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full h-11 pl-10 pr-4 bg-[#F5F6F3] border border-[#DCE1D8] focus:bg-white focus:border-[#C84B11] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none"
+                className="w-full h-11 pl-10 pr-4 bg-[#F5F6F3] border border-[#8E9891] focus:bg-white focus:border-[#C84B11] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67]"
               />
             </div>
 
@@ -271,7 +271,7 @@ export default function ExercisesPage() {
                   setMuscleRegion("");
                   setPage(1);
                 }}
-                className="w-full h-11 px-3 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] outline-none focus:border-[#C84B11]"
+                className="w-full h-11 px-3 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] focus:border-[#C84B11]"
               >
                 {MUSCLE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -291,7 +291,7 @@ export default function ExercisesPage() {
                   setEquipment(e.target.value);
                   setPage(1);
                 }}
-                className="w-full h-11 px-3 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] outline-none focus:border-[#C84B11]"
+                className="w-full h-11 px-3 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] focus:border-[#C84B11]"
               >
                 {EQUIPMENT_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -311,7 +311,7 @@ export default function ExercisesPage() {
                   setDifficulty(e.target.value);
                   setPage(1);
                 }}
-                className="w-full h-11 px-3 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] outline-none focus:border-[#C84B11]"
+                className="w-full h-11 px-3 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] focus:border-[#C84B11]"
               >
                 {DIFFICULTY_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -335,7 +335,7 @@ export default function ExercisesPage() {
                   setMuscleRegion("");
                   setPage(1);
                 }}
-                className={`h-8 px-3 rounded-lg text-xs font-semibold border cursor-pointer ${
+                className={`min-h-[40px] px-3.5 rounded-lg text-xs font-semibold border cursor-pointer ${
                   muscleRegion === ""
                     ? "bg-[#141916] text-white border-[#141916]"
                     : "bg-[#F5F6F3] text-[#48524C] border-[#DCE1D8]"
@@ -352,9 +352,9 @@ export default function ExercisesPage() {
                     setMuscleRegion(opt.value);
                     setPage(1);
                   }}
-                  className={`h-8 px-3 rounded-lg text-xs font-semibold border cursor-pointer ${
+                  className={`min-h-[40px] px-3.5 rounded-lg text-xs font-semibold border cursor-pointer ${
                     muscleRegion === opt.value
-                      ? "bg-[#FFF1EA] text-[#C84B11] border-[#C84B11]"
+                      ? "bg-[#FFF1EA] text-[#A83D0B] border-[#C84B11]"
                       : "bg-[#F5F6F3] text-[#48524C] border-[#DCE1D8]"
                   }`}
                 >
@@ -401,7 +401,7 @@ export default function ExercisesPage() {
                         setScope(item.value);
                         setPage(1);
                       }}
-                      className={`h-9 px-3 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      className={`h-10 px-3.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
                         scope === item.value
                           ? "bg-white text-[#141916] shadow-xs"
                           : "text-[#48524C] hover:text-[#141916]"
@@ -509,11 +509,9 @@ export default function ExercisesPage() {
               {exercises.map((exercise) => {
                 const thumb = exercise.images?.[0];
                 return (
-                  <button
+                  <article
                     key={exercise.id}
-                    type="button"
-                    onClick={() => handleOpenDetail(exercise)}
-                    className="text-left bg-white border border-[#DCE1D8] hover:border-[#C5CCC0] rounded-2xl p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group"
+                    className="relative text-left bg-white border border-[#DCE1D8] hover:border-[#8E9891] rounded-2xl p-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
                   >
                     <div>
                       <ExerciseThumbnail
@@ -526,11 +524,17 @@ export default function ExercisesPage() {
                       />
 
                       <div className="flex items-start justify-between gap-2">
-                        <h2 className="text-base font-bold text-[#141916] group-hover:text-[#C84B11] transition-colors line-clamp-1">
-                          {exercise.name}
+                        <h2 className="text-base font-bold text-[#141916] group-hover:text-[#A83D0B] transition-colors line-clamp-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDetail(exercise)}
+                            className="text-left after:absolute after:inset-0 cursor-pointer rounded-md"
+                          >
+                            {exercise.name}
+                          </button>
                         </h2>
                         {exercise.is_custom && (
-                          <span className="px-2 py-0.5 rounded-md bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] text-[11px] font-bold shrink-0">
+                          <span className="relative z-10 px-2 py-0.5 rounded-md bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] text-[11px] font-bold shrink-0">
                             Custom
                           </span>
                         )}
@@ -538,13 +542,13 @@ export default function ExercisesPage() {
 
                       <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
                         {exercise.muscle_region && (
-                          <span className="px-2 py-0.5 rounded-md bg-[#FFF1EA] text-[#C84B11] border border-[#F4C4AC] text-xs font-semibold">
+                          <span className="px-2 py-0.5 rounded-md bg-[#FFF1EA] text-[#A83D0B] border border-[#F4C4AC] text-xs font-semibold">
                             {REGION_LABEL[exercise.muscle_region] ||
                               exercise.muscle_region}
                           </span>
                         )}
                         {!exercise.muscle_region && exercise.primary_muscle && (
-                          <span className="px-2 py-0.5 rounded-md bg-[#FFF1EA] text-[#C84B11] border border-[#F4C4AC] text-xs font-semibold capitalize">
+                          <span className="px-2 py-0.5 rounded-md bg-[#FFF1EA] text-[#A83D0B] border border-[#F4C4AC] text-xs font-semibold capitalize">
                             {exercise.primary_muscle}
                           </span>
                         )}
@@ -561,11 +565,11 @@ export default function ExercisesPage() {
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-[#DCE1D8] flex items-center justify-between text-xs font-semibold text-[#C84B11]">
+                    <div className="mt-4 pt-3 border-t border-[#DCE1D8] flex items-center justify-between text-xs font-semibold text-[#A83D0B]">
                       <span>Lihat Panduan & Teknik</span>
                       <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                     </div>
-                  </button>
+                  </article>
                 );
               })}
             </div>

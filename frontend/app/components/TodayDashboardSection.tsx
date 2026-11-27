@@ -39,40 +39,13 @@ import {
   WorkoutLogEntry,
 } from "@/types/workout";
 import { MUSCLE_LABELS } from "@/lib/scheduleValidation";
+import {
+  SESSION_STATUS_META,
+  getRirZone,
+  formatIndonesianDateString,
+} from "@/lib/sessionStatus";
 import ExerciseThumbnail from "@/app/components/ExerciseThumbnail";
 import ExerciseDetailModal from "@/app/components/ExerciseDetailModal";
-
-const STATUS_BADGE: Record<
-  DailySessionStatus,
-  { label: string; badgeClass: string }
-> = {
-  pending: {
-    label: "Belum Selesai",
-    badgeClass: "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]",
-  },
-  done: {
-    label: "Selesai",
-    badgeClass: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
-  },
-  skipped: {
-    label: "Dilewati",
-    badgeClass: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
-  },
-  rest: {
-    label: "Hari Istirahat",
-    badgeClass: "bg-[#ECEFE9] text-[#48524C] border-[#DCE1D8]",
-  },
-};
-
-function getRirBadgeStyle(rir: number | null | undefined) {
-  if (rir === 0) {
-    return "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]";
-  }
-  if (rir === 1 || rir === 2) {
-    return "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]";
-  }
-  return "bg-[#ECEFE9] text-[#48524C] border-[#DCE1D8]";
-}
 
 export default function TodayDashboardSection() {
   const { user, isLoading: authLoading } = useAuth();
@@ -118,6 +91,15 @@ export default function TodayDashboardSection() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!isRescheduleOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsRescheduleOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isRescheduleOpen]);
+
   const handleStatusChange = async (nextStatus: DailySessionStatus) => {
     if (!todayData?.data) return;
     setIsUpdatingStatus(true);
@@ -130,6 +112,14 @@ export default function TodayDashboardSection() {
       setStatusError(res.message);
       return;
     }
+
+    const successLabels: Record<DailySessionStatus, string> = {
+      done: "Sesi hari ini ditandai selesai.",
+      skipped: "Sesi hari ini ditandai dilewati.",
+      pending: "Status sesi dikembalikan ke belum selesai.",
+      rest: "Status sesi diperbarui menjadi hari istirahat.",
+    };
+    setStatusSuccess(successLabels[nextStatus]);
 
     const refreshed = await getTodaySession();
     if (refreshed) setTodayData(refreshed);
@@ -321,21 +311,21 @@ export default function TodayDashboardSection() {
       <div className="flex flex-wrap items-center gap-2.5">
         <Link
           href="/onboarding"
-          className="h-10 px-4 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] hover:border-[#C5CCC0] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs"
+          className="h-11 px-4 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] hover:border-[#8E9891] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs"
         >
-          <CalendarRange className="w-4 h-4 text-[#C84B11]" />
+          <CalendarRange className="w-4 h-4 text-[#A83D0B]" />
           <span>Atur Jadwal</span>
         </Link>
         <Link
           href="/client/progress"
-          className="h-10 px-4 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] hover:border-[#C5CCC0] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs"
+          className="h-11 px-4 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] hover:border-[#8E9891] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs"
         >
           <TrendingUp className="w-4 h-4 text-[#047857]" />
           <span>Progres & Riwayat</span>
         </Link>
         <Link
           href="/client/trainer"
-          className="h-10 px-4 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] hover:border-[#C5CCC0] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs"
+          className="h-11 px-4 bg-white hover:bg-[#ECEFE9] border border-[#DCE1D8] hover:border-[#8E9891] text-[#141916] rounded-xl text-xs sm:text-sm font-semibold inline-flex items-center gap-2 transition-colors shadow-xs"
         >
           <Award className="w-4 h-4 text-[#1D4ED8]" />
           <span>Personal Trainer</span>
@@ -367,7 +357,8 @@ export default function TodayDashboardSection() {
         (() => {
           const daily = todayData.data;
           const splitSession = daily.split_session;
-          const badge = STATUS_BADGE[daily.status] || STATUS_BADGE.pending;
+          const badge =
+            SESSION_STATUS_META[daily.status] || SESSION_STATUS_META.pending;
           const isTrainerOverride = daily.changed_by_role === "trainer";
           const exercises = splitSession?.exercises || [];
 
@@ -395,8 +386,8 @@ export default function TodayDashboardSection() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-[#48524C]">
-                    <span className="font-mono tabular-nums font-semibold text-[#141916]">
-                      {daily.session_date}
+                    <span className="font-semibold text-[#141916]">
+                      {formatIndonesianDateString(daily.session_date)}
                     </span>
                     {daily.user_plan?.split?.name && (
                       <span>• Program {daily.user_plan.split.name}</span>
@@ -517,9 +508,20 @@ export default function TodayDashboardSection() {
               {statusSuccess && (
                 <div
                   role="status"
-                  className="p-3.5 bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl text-xs sm:text-sm text-[#047857] font-medium"
+                  className="p-3.5 bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl text-xs sm:text-sm text-[#047857] font-medium flex flex-wrap items-center justify-between gap-2"
                 >
-                  {statusSuccess}
+                  <span>{statusSuccess}</span>
+                  {(daily.status === "done" || daily.status === "skipped") &&
+                    !isTrainerOverride && (
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange("pending")}
+                        disabled={isUpdatingStatus}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-[#A7F3D0] text-[#047857] hover:bg-[#ECFDF5] text-xs font-bold cursor-pointer"
+                      >
+                        Batalkan (Undo)
+                      </button>
+                    )}
                 </div>
               )}
 
@@ -569,7 +571,7 @@ export default function TodayDashboardSection() {
                         <button
                           type="button"
                           onClick={() => openHowTo(ex)}
-                          className="h-9 px-2.5 bg-white hover:bg-[#FFF1EA] border border-[#DCE1D8] hover:border-[#F4C4AC] text-[#C84B11] rounded-lg text-xs font-semibold flex items-center gap-1 shrink-0 cursor-pointer"
+                          className="min-h-[44px] px-3 bg-white hover:bg-[#FFF1EA] border border-[#DCE1D8] hover:border-[#F4C4AC] text-[#A83D0B] rounded-lg text-xs font-semibold flex items-center gap-1 shrink-0 cursor-pointer"
                           aria-label={`Lihat cara melakukan ${ex.name}`}
                         >
                           <HelpCircle className="w-3.5 h-3.5" />
@@ -585,20 +587,20 @@ export default function TodayDashboardSection() {
               {todayData.week_overview.length > 0 && (
                 <div className="pt-4 border-t border-[#DCE1D8] space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-[#626E67]">
+                    <span className="text-xs font-semibold text-[#48524C]">
                       Jadwal Minggu Ini
                     </span>
                     <div className="flex items-center gap-4 text-xs font-semibold">
                       <Link
                         href="/onboarding"
-                        className="text-[#48524C] hover:text-[#C84B11] inline-flex items-center gap-1"
+                        className="text-[#48524C] hover:text-[#A83D0B] inline-flex items-center gap-1 min-h-[36px]"
                       >
                         <CalendarRange className="w-3.5 h-3.5" />
                         <span>Ubah Jadwal</span>
                       </Link>
                       <Link
                         href="/evaluation"
-                        className="text-[#C84B11] hover:underline inline-flex items-center gap-1"
+                        className="text-[#A83D0B] hover:underline inline-flex items-center gap-1 min-h-[36px]"
                       >
                         <BarChart3 className="w-3.5 h-3.5" />
                         <span>Evaluasi Mingguan</span>
@@ -609,7 +611,8 @@ export default function TodayDashboardSection() {
                   <div className="grid grid-cols-2 sm:grid-cols-7 gap-2">
                     {todayData.week_overview.map((day) => {
                       const dayBadge =
-                        STATUS_BADGE[day.status] || STATUS_BADGE.pending;
+                        SESSION_STATUS_META[day.status] ||
+                        SESSION_STATUS_META.pending;
                       return (
                         <div
                           key={day.date}
@@ -624,7 +627,7 @@ export default function TodayDashboardSection() {
                               {day.day_short}
                             </span>
                             {day.is_today && (
-                              <span className="text-[11px] font-bold text-[#C84B11]">
+                              <span className="text-xs font-bold text-[#A83D0B]">
                                 Hari Ini
                               </span>
                             )}
@@ -661,7 +664,7 @@ export default function TodayDashboardSection() {
             </h2>
             <Link
               href="/client/progress"
-              className="text-xs font-semibold text-[#C84B11] hover:underline"
+              className="text-xs font-semibold text-[#A83D0B] hover:underline min-h-[36px] inline-flex items-center"
             >
               Lihat Semua Progres →
             </Link>
@@ -700,9 +703,9 @@ export default function TodayDashboardSection() {
                   <div className="sm:col-span-2 flex sm:justify-end">
                     {log.rir !== null && log.rir !== undefined ? (
                       <span
-                        className={`text-xs font-mono tabular-nums font-semibold px-2.5 py-1 rounded-lg border ${getRirBadgeStyle(
-                          log.rir
-                        )}`}
+                        className={`text-xs font-mono tabular-nums font-semibold px-2.5 py-1 rounded-lg border ${
+                          getRirZone(log.rir).badgeClass
+                        }`}
                       >
                         RIR {log.rir}
                       </span>
@@ -763,9 +766,9 @@ export default function TodayDashboardSection() {
 
             <form onSubmit={handleRescheduleSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#141916] mb-2">
+                <p className="block text-xs font-semibold text-[#141916] mb-2">
                   Pilih Tanggal Tujuan <span className="text-[#BE123C]">*</span>
-                </label>
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {(todayData.upcoming_options || []).map((opt) => {
                     const selected = rescheduleDate === opt.date;
@@ -773,19 +776,20 @@ export default function TodayDashboardSection() {
                       <button
                         key={opt.date}
                         type="button"
+                        aria-pressed={selected}
                         disabled={opt.is_locked}
                         onClick={() => setRescheduleDate(opt.date)}
-                        className={`p-3 rounded-xl border text-left transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                        className={`p-3 min-h-[56px] rounded-xl border text-left transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                           selected
                             ? "bg-[#FFF1EA] border-[#C84B11]"
-                            : "bg-[#F5F6F3] border-[#DCE1D8] hover:border-[#C5CCC0]"
+                            : "bg-[#F5F6F3] border-[#DCE1D8] hover:border-[#8E9891]"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs font-bold text-[#141916]">
                             {opt.day_name}
                           </span>
-                          <span className="text-[11px] font-mono tabular-nums text-[#626E67]">
+                          <span className="text-[11px] font-mono tabular-nums text-[#48524C]">
                             {opt.date}
                           </span>
                         </div>
@@ -801,7 +805,10 @@ export default function TodayDashboardSection() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-[#141916] mb-1.5">
+                <label
+                  htmlFor="reschedule-reason"
+                  className="block text-xs font-semibold text-[#141916] mb-1.5"
+                >
                   Alasan Geser Jadwal <span className="text-[#BE123C]">*</span>
                 </label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -810,7 +817,7 @@ export default function TodayDashboardSection() {
                       key={preset}
                       type="button"
                       onClick={() => setRescheduleReason(preset)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border cursor-pointer transition-colors ${
+                      className={`min-h-[44px] px-3 py-2 rounded-lg text-xs font-medium border cursor-pointer transition-colors ${
                         rescheduleReason === preset
                           ? "bg-[#141916] text-white border-[#141916]"
                           : "bg-[#F5F6F3] text-[#48524C] border-[#DCE1D8] hover:text-[#141916]"
@@ -821,6 +828,7 @@ export default function TodayDashboardSection() {
                   ))}
                 </div>
                 <input
+                  id="reschedule-reason"
                   type="text"
                   required
                   minLength={3}
@@ -828,7 +836,7 @@ export default function TodayDashboardSection() {
                   placeholder="Tulis alasan Anda (misal: sedang demam / lembur kantor)..."
                   value={rescheduleReason}
                   onChange={(e) => setRescheduleReason(e.target.value)}
-                  className="w-full h-11 px-3.5 bg-white border border-[#C5CCC0] focus:border-[#C84B11] rounded-xl text-sm outline-none"
+                  className="w-full h-11 px-3.5 bg-white border border-[#8E9891] focus:border-[#C84B11] rounded-xl text-sm"
                 />
               </div>
 

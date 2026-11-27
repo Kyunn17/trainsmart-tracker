@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
-  Dumbbell,
   Lock,
   Mail,
   User,
@@ -14,6 +13,8 @@ import {
   Users,
   AlertCircle,
   ArrowLeft,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getTrainers } from "@/lib/api";
@@ -29,6 +30,8 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [phone, setPhone] = useState("");
   const [specialization, setSpecialization] = useState("");
   const [trainerId, setTrainerId] = useState<number | null>(null);
@@ -95,7 +98,7 @@ export default function RegisterPage() {
         <div>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-[#48524C] hover:text-[#141916] px-3.5 py-2 rounded-xl border border-[#DCE1D8] bg-[#F5F6F3] hover:bg-[#ECEFE9] transition-colors w-fit"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#48524C] hover:text-[#141916] min-h-[44px] px-4 rounded-xl border border-[#DCE1D8] bg-[#F5F6F3] hover:bg-[#ECEFE9] transition-colors w-fit"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Kembali ke Beranda</span>
@@ -105,8 +108,15 @@ export default function RegisterPage() {
         <div className="my-auto w-full max-w-lg mx-auto py-6">
           <div className="mb-6">
             <div className="inline-flex items-center gap-2.5 mb-4">
-              <div className="w-10 h-10 bg-[#C84B11] rounded-xl flex items-center justify-center text-white shadow-xs">
-                <Dumbbell className="w-5 h-5" />
+              <div className="w-10 h-10 bg-[#ECEFE9] rounded-xl flex items-center justify-center p-1.5 border border-[#DCE1D8] shadow-xs">
+                <Image
+                  src="/icon.png"
+                  alt="TrainSmart"
+                  width={32}
+                  height={32}
+                  className="w-full h-full object-contain"
+                  priority
+                />
               </div>
               <span className="font-bold text-lg tracking-tight text-[#141916]">
                 TrainSmart
@@ -184,7 +194,7 @@ export default function RegisterPage() {
                   placeholder="Budi Santoso"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full h-11 pl-10 pr-4 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#C84B11]"
+                  className="w-full h-11 pl-10 pr-4 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] focus:border-[#C84B11]"
                   required
                 />
               </div>
@@ -206,7 +216,7 @@ export default function RegisterPage() {
                   placeholder="budi@email.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full h-11 pl-10 pr-4 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#C84B11]"
+                  className="w-full h-11 pl-10 pr-4 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] focus:border-[#C84B11]"
                   required
                 />
               </div>
@@ -224,14 +234,30 @@ export default function RegisterPage() {
                   <Lock className="w-4 h-4 text-[#626E67] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     id="reg-password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
                     placeholder="Min. 6 karakter"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full h-11 pl-10 pr-3 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#C84B11]"
+                    className="w-full h-11 pl-10 pr-11 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] focus:border-[#C84B11]"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-0 top-0 h-11 w-11 flex items-center justify-center text-[#48524C] hover:text-[#141916] rounded-r-xl cursor-pointer"
+                    aria-label={
+                      showPassword
+                        ? "Sembunyikan kata sandi"
+                        : "Tampilkan kata sandi"
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
               </div>
               <div>
@@ -245,14 +271,30 @@ export default function RegisterPage() {
                   <Lock className="w-4 h-4 text-[#626E67] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     id="reg-password-confirm"
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     autoComplete="new-password"
                     placeholder="Ulangi sandi"
                     value={passwordConfirmation}
                     onChange={(e) => setPasswordConfirmation(e.target.value)}
-                    className="w-full h-11 pl-10 pr-3 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#C84B11]"
+                    className="w-full h-11 pl-10 pr-11 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] focus:border-[#C84B11]"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    className="absolute right-0 top-0 h-11 w-11 flex items-center justify-center text-[#48524C] hover:text-[#141916] rounded-r-xl cursor-pointer"
+                    aria-label={
+                      showConfirmPassword
+                        ? "Sembunyikan konfirmasi sandi"
+                        : "Tampilkan konfirmasi sandi"
+                    }
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
@@ -273,7 +315,7 @@ export default function RegisterPage() {
                   placeholder="+62 812..."
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full h-11 pl-10 pr-4 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] outline-none focus:border-[#C84B11]"
+                  className="w-full h-11 pl-10 pr-4 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] placeholder:text-[#626E67] focus:border-[#C84B11]"
                 />
               </div>
             </div>
@@ -312,7 +354,7 @@ export default function RegisterPage() {
                       e.target.value ? parseInt(e.target.value, 10) : null
                     )
                   }
-                  className="w-full h-11 px-3.5 bg-white border border-[#C5CCC0] rounded-xl text-sm text-[#141916] outline-none focus:border-[#C84B11]"
+                  className="w-full h-11 px-3.5 bg-white border border-[#8E9891] rounded-xl text-sm text-[#141916] focus:border-[#C84B11]"
                 >
                   <option value="">-- Tanpa Trainer (Latihan Mandiri) --</option>
                   {availableTrainers.map((t) => (
@@ -341,7 +383,7 @@ export default function RegisterPage() {
             Sudah punya akun?{" "}
             <Link
               href="/login"
-              className="text-[#C84B11] font-semibold hover:underline"
+              className="text-[#A83D0B] font-semibold hover:underline"
             >
               Masuk di Sini
             </Link>
@@ -368,9 +410,6 @@ export default function RegisterPage() {
           aria-hidden="true"
         />
         <div className="absolute bottom-10 left-10 right-10 z-10 max-w-md space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#F4C4AC]">
-            Mulai Terstruktur
-          </p>
           <h2 className="text-2xl font-bold text-white leading-snug">
             Susun split latihan ideal dan pahami teknik gerakan sejak hari pertama.
           </h2>

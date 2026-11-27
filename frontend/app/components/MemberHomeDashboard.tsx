@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Activity,
+  AlertCircle,
   ArrowRight,
   Award,
-  BarChart3,
-  BookOpen,
   Calendar,
   CalendarRange,
   CheckCircle2,
@@ -17,9 +15,8 @@ import {
   Dumbbell,
   Flame,
   Info,
-  LayoutGrid,
   Play,
-  PlusCircle,
+  RefreshCw,
   ShieldAlert,
   Sparkles,
   TrendingDown,
@@ -39,13 +36,13 @@ import {
 } from "@/lib/api";
 import {
   CoachingRequest,
-  DailySessionStatus,
   TodaySessionResponse,
   User,
   WeeklyEvaluationResponse,
   WorkoutLogEntry,
 } from "@/types/workout";
 import { MUSCLE_LABELS } from "@/lib/scheduleValidation";
+import { SESSION_STATUS_META, getRirZone } from "@/lib/sessionStatus";
 
 interface AdminStats {
   total_users: number;
@@ -98,59 +95,11 @@ function getInitials(name: string): string {
     .join("");
 }
 
-function getRirZone(rir: number | null | undefined): {
-  label: string;
-  badgeClass: string;
-} {
-  if (rir === null || rir === undefined) {
-    return {
-      label: "Belum ada data",
-      badgeClass: "bg-[#ECEFE9] text-[#48524C] border-[#DCE1D8]",
-    };
-  }
-  if (rir >= 1 && rir <= 2) {
-    return {
-      label: "Optimal 1–2",
-      badgeClass: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
-    };
-  }
-  if (rir < 1) {
-    return {
-      label: "Mendekati Gagal",
-      badgeClass: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
-    };
-  }
-  return {
-    label: "Terlalu Ringan",
-    badgeClass: "bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]",
-  };
-}
-
-const SESSION_STATUS_META: Record<
-  DailySessionStatus,
-  { label: string; pillClass: string }
-> = {
-  pending: {
-    label: "Siap Dijalankan",
-    pillClass: "bg-[#FFF1EA] text-[#C84B11] border-[#F4C4AC]",
-  },
-  done: {
-    label: "Selesai",
-    pillClass: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
-  },
-  skipped: {
-    label: "Dilewati",
-    pillClass: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
-  },
-  rest: {
-    label: "Pemulihan",
-    pillClass: "bg-[#ECEFE9] text-[#48524C] border-[#DCE1D8]",
-  },
-};
-
 export default function MemberHomeDashboard() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Client state
   const [todayData, setTodayData] = useState<TodaySessionResponse | null>(null);
@@ -185,6 +134,15 @@ export default function MemberHomeDashboard() {
             getClientMyProgress(),
           ]);
           if (!active) return;
+
+          if (!todayRes && !evalRes.success && !progressRes) {
+            setFetchError(
+              "Gagal memuat ringkasan latihan Anda. Pastikan koneksi ke server berjalan lalu coba lagi."
+            );
+            return;
+          }
+
+          setFetchError(null);
           setTodayData(todayRes);
           setWeeklyEval(evalRes.success && evalRes.data ? evalRes.data : null);
           if (progressRes) {
@@ -198,12 +156,26 @@ export default function MemberHomeDashboard() {
             getTrainerCoachingRequests(),
           ]);
           if (!active) return;
+          setFetchError(null);
           setTrainerClients(clientsRes);
           setTrainerRequests(requestsRes);
         } else if (user.role === "admin") {
           const statsRes = await getAdminStats();
           if (!active) return;
+          if (!statsRes) {
+            setFetchError(
+              "Gagal memuat statistik platform. Periksa koneksi server lalu coba lagi."
+            );
+            return;
+          }
+          setFetchError(null);
           setAdminStats(statsRes);
+        }
+      } catch {
+        if (active) {
+          setFetchError(
+            "Terjadi gangguan saat memuat dashboard. Silakan coba lagi."
+          );
         }
       } finally {
         if (active) setIsLoading(false);
@@ -215,7 +187,13 @@ export default function MemberHomeDashboard() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [user, reloadKey]);
+
+  const handleRetry = () => {
+    setFetchError(null);
+    setIsLoading(true);
+    setReloadKey((k) => k + 1);
+  };
 
   if (!user) return null;
 
@@ -227,15 +205,15 @@ export default function MemberHomeDashboard() {
   const roleMeta = {
     client: {
       label: "Member Gym",
-      pillClass: "bg-white/10 text-[#E4E8E1] border-white/20",
+      pillClass: "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]",
     },
     trainer: {
       label: "Personal Trainer",
-      pillClass: "bg-[#EFF6FF]/15 text-[#BFDBFE] border-[#93C5FD]/30",
+      pillClass: "bg-[#EFF6FF] text-[#1D4ED8] border-[#BFDBFE]",
     },
     admin: {
       label: "Administrator",
-      pillClass: "bg-[#FFF1F2]/15 text-[#FECDD3] border-[#FDA4AF]/30",
+      pillClass: "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]",
     },
   }[user.role];
 
@@ -243,22 +221,57 @@ export default function MemberHomeDashboard() {
     return (
       <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6 animate-pulse">
-          <div className="h-56 sm:h-60 rounded-2xl bg-[#252D28]" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="h-28 rounded-2xl bg-white border border-[#DCE1D8]" />
-            <div className="h-28 rounded-2xl bg-white border border-[#DCE1D8]" />
-            <div className="h-28 rounded-2xl bg-white border border-[#DCE1D8]" />
-            <div className="h-28 rounded-2xl bg-white border border-[#DCE1D8]" />
+          <div className="pb-6 border-b border-[#DCE1D8] flex flex-col lg:flex-row justify-between gap-4">
+            <div className="space-y-3">
+              <div className="h-5 w-48 rounded-full bg-[#ECEFE9]" />
+              <div className="h-9 w-72 rounded-xl bg-[#ECEFE9]" />
+              <div className="h-4 w-96 max-w-full rounded bg-[#ECEFE9]" />
+            </div>
+            <div className="h-11 w-48 rounded-xl bg-[#ECEFE9]" />
           </div>
+          <div className="h-32 rounded-2xl bg-white border border-[#DCE1D8]" />
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-7 space-y-6">
               <div className="h-52 rounded-2xl bg-white border border-[#DCE1D8]" />
               <div className="h-44 rounded-2xl bg-white border border-[#DCE1D8]" />
             </div>
             <div className="lg:col-span-5 space-y-6">
-              <div className="h-48 rounded-2xl bg-white border border-[#DCE1D8]" />
-              <div className="h-48 rounded-2xl bg-white border border-[#DCE1D8]" />
+              <div className="h-40 rounded-2xl bg-white border border-[#DCE1D8]" />
+              <div className="h-52 rounded-2xl bg-white border border-[#DCE1D8]" />
             </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+          <div
+            role="alert"
+            className="bg-white border border-[#FECDD3] rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5"
+          >
+            <div className="flex items-start gap-3.5">
+              <AlertCircle className="w-6 h-6 text-[#BE123C] shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h1 className="text-lg font-bold text-[#141916]">
+                  Tidak Dapat Memuat Beranda
+                </h1>
+                <p className="text-sm text-[#48524C] leading-relaxed">
+                  {fetchError}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRetry}
+              className="min-h-[44px] px-5 rounded-xl bg-[#C84B11] hover:bg-[#A83D0B] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Coba Lagi</span>
+            </button>
           </div>
         </div>
       </main>
@@ -270,23 +283,22 @@ export default function MemberHomeDashboard() {
   const weekOverview = todayData?.week_overview ?? [];
   const pendingRequests = trainerRequests.filter((r) => r.status === "pending");
 
-  // Contextual 1-line summary for hero
   let heroSummary =
-    "Pantau jadwal latihan, target beban, dan catatan progres Anda dari satu tempat.";
+    "Ringkasan performa mingguan, jadwal sesi, dan aktivitas latihan Anda.";
   if (user.role === "client") {
     if (!hasPlan) {
       heroSummary =
         "Anda belum memiliki jadwal latihan aktif. Susun jadwal mingguan dalam 1 menit sesuai waktu luang Anda.";
     } else if (todaySession?.status === "done") {
-      heroSummary = `Sesi ${todaySession.split_session?.name || "hari ini"} telah selesai. Fokus pada hidrasi, protein, dan istirahat berkualitas.`;
+      heroSummary = `Sesi ${todaySession.split_session?.name || "hari ini"} telah selesai. Fokus pada hidrasi, asupan protein, dan pemulihan.`;
     } else if (todaySession?.status === "rest") {
       heroSummary =
-        "Hari ini adalah jadwal pemulihan otot (Rest Day). Pertahankan nutrisi agar performa sesi berikutnya maksimal.";
+        "Hari ini dijadwalkan sebagai Hari Istirahat untuk pemulihan otot agar performa sesi berikutnya optimal.";
     } else if (todaySession?.status === "skipped") {
       heroSummary =
-        "Jadwal hari ini ditandai dilewati. Anda tetap bisa menggeser atau melanjutkan rutinitas di sesi berikutnya.";
+        "Jadwal hari ini ditandai dilewati. Anda dapat membuka halaman Latihan untuk meninjau atau mengembalikan status sesi.";
     } else if (todaySession) {
-      heroSummary = `Jadwal hari ini: ${todaySession.split_session?.name || "Sesi Latihan"} — target intensitas 1–2 RIR dengan teknik penuh.`;
+      heroSummary = `Jadwal hari ini: ${todaySession.split_session?.name || "Sesi Latihan"} — target 1–2 RIR (sisakan 1–2 repetisi sebelum gagal).`;
     }
   } else if (user.role === "trainer") {
     heroSummary =
@@ -299,55 +311,6 @@ export default function MemberHomeDashboard() {
       : "Kelola pengguna, moderasi gerakan custom, dan pantau aktivitas platform TrainSmart.";
   }
 
-  // Quick actions (uniform 2x2 grid)
-  const quickActions = [
-    {
-      href: "/training",
-      title: "Dashboard Latihan",
-      subtitle: "Sesi hari ini & jadwal",
-      icon: <LayoutGrid className="w-4 h-4 text-[#C84B11]" />,
-      iconBg: "bg-[#FFF1EA] border-[#F4C4AC]",
-    },
-    {
-      href: "/exercises",
-      title: "Katalog Gerakan",
-      subtitle: "53+ teknik & ilustrasi otot",
-      icon: <BookOpen className="w-4 h-4 text-[#141916]" />,
-      iconBg: "bg-[#ECEFE9] border-[#DCE1D8]",
-    },
-    user.role === "client"
-      ? {
-          href: "/evaluation",
-          title: "Evaluasi Mingguan",
-          subtitle: "Kepatuhan & saran beban",
-          icon: <BarChart3 className="w-4 h-4 text-[#047857]" />,
-          iconBg: "bg-[#ECFDF5] border-[#A7F3D0]",
-        }
-      : user.role === "trainer"
-      ? {
-          href: "/trainer",
-          title: "Klien Saya",
-          subtitle: `${trainerClients.length} member aktif`,
-          icon: <Users className="w-4 h-4 text-[#1D4ED8]" />,
-          iconBg: "bg-[#EFF6FF] border-[#BFDBFE]",
-        }
-      : {
-          href: "/admin",
-          title: "Admin Panel",
-          subtitle: "Moderasi & data master",
-          icon: <ShieldAlert className="w-4 h-4 text-[#BE123C]" />,
-          iconBg: "bg-[#FFF1F2] border-[#FECDD3]",
-        },
-    {
-      href: "/my-exercises",
-      title: "Gerakan Custom",
-      subtitle: "Ajukan gerakan pribadi",
-      icon: <PlusCircle className="w-4 h-4 text-[#B45309]" />,
-      iconBg: "bg-[#FFFBEB] border-[#FDE68A]",
-    },
-  ];
-
-  // Computed client metrics
   const completionPct = weeklyEval?.completion_percentage ?? 0;
   const completedSessions = weeklyEval?.completed_sessions ?? 0;
   const scheduledSessions = weeklyEval?.scheduled_sessions ?? 0;
@@ -361,129 +324,135 @@ export default function MemberHomeDashboard() {
 
   return (
     <main className="flex-1 bg-[#F5F6F3] text-[#141916]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-8">
         {/* ================================================================= */}
-        {/* 1. ARCHITECTURAL GREETING BANNER                                  */}
+        {/* 1. ATHLETIC EDITORIAL HEADER + SINGLE PRIMARY CTA                 */}
         {/* ================================================================= */}
-        <section className="relative overflow-hidden rounded-2xl bg-[#141916] border border-[#252D28] text-white shadow-sm">
-          <Image
-            src="/homebg.png"
-            alt="Suasana ruang latihan TrainSmart"
-            fill
-            priority
-            sizes="(max-width: 1200px) 100vw, 1152px"
-            className="object-cover object-center opacity-55"
-          />
-          <div
-            className="absolute inset-0 bg-gradient-to-r from-[#141916] via-[#141916]/90 to-[#141916]/45"
-            aria-hidden="true"
-          />
-
-          <div className="relative z-10 p-6 sm:p-8 lg:p-10 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-            <div className="max-w-2xl space-y-3.5">
-              <div className="flex flex-wrap items-center gap-2.5 text-xs">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[#E4E8E1] font-medium">
-                  <Calendar className="w-3.5 h-3.5 text-[#F4C4AC]" />
-                  <span>{formattedDate}</span>
-                </span>
-                <span
-                  className={`inline-flex items-center px-3 py-1 rounded-full border font-semibold ${roleMeta.pillClass}`}
-                >
-                  {roleMeta.label}
-                </span>
-              </div>
-
-              <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white leading-tight">
-                {greeting}, {firstName}
-              </h1>
-
-              <p className="text-sm sm:text-base text-[#D1D7CD] leading-relaxed max-w-xl">
-                {heroSummary}
-              </p>
+        <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-[#DCE1D8]">
+          <div className="max-w-2xl space-y-2.5">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 text-[#48524C] font-medium">
+                <Calendar className="w-3.5 h-3.5 text-[#A83D0B]" />
+                <span>{formattedDate}</span>
+              </span>
+              <span className="text-[#8E9891]" aria-hidden="true">
+                ·
+              </span>
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full border font-semibold ${roleMeta.pillClass}`}
+              >
+                {roleMeta.label}
+              </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 shrink-0">
-              {user.role === "client" && (
-                <>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#141916]">
+              {greeting}, {firstName}
+            </h1>
+
+            <p className="text-sm sm:text-base text-[#48524C] leading-relaxed">
+              {heroSummary}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            {user.role === "client" && (
+              <>
+                {!hasPlan ? (
                   <Link
-                    href="/training"
-                    className="h-11 px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors shadow-xs"
+                    href="/onboarding"
+                    className="min-h-[44px] px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors shadow-xs"
                   >
-                    <span>Buka Dashboard Latihan</span>
+                    <CalendarRange className="w-4 h-4" />
+                    <span>Susun Jadwal Latihan</span>
                     <ArrowRight className="w-4 h-4" />
                   </Link>
-                  {!hasPlan ? (
+                ) : todaySession && todaySession.status === "pending" ? (
+                  <>
                     <Link
-                      href="/onboarding"
-                      className="h-11 px-5 bg-white/10 hover:bg-white/20 text-white border border-white/25 font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors backdrop-blur-xs"
+                      href={`/session/${todaySession.id}`}
+                      className="min-h-[44px] px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors shadow-xs"
                     >
-                      <CalendarRange className="w-4 h-4" />
-                      <span>Susun Jadwal</span>
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>
+                        Mulai Sesi:{" "}
+                        {todaySession.split_session?.name || "Hari Ini"}
+                      </span>
                     </Link>
-                  ) : (
-                    todaySession &&
-                    todaySession.status === "pending" && (
-                      <Link
-                        href={`/session/${todaySession.id}`}
-                        className="h-11 px-5 bg-white/10 hover:bg-white/20 text-white border border-white/25 font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors backdrop-blur-xs"
-                      >
-                        <Play className="w-4 h-4 fill-current" />
-                        <span>Mulai Sesi Sekarang</span>
-                      </Link>
-                    )
-                  )}
-                </>
-              )}
+                    <Link
+                      href="/training"
+                      className="min-h-[44px] px-4 bg-white hover:bg-[#ECEFE9] border border-[#8E9891] text-[#141916] font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors"
+                    >
+                      <span>Kelola Latihan</span>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href="/training"
+                      className="min-h-[44px] px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors shadow-xs"
+                    >
+                      <span>Kelola Latihan</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
+                    <Link
+                      href="/evaluation"
+                      className="min-h-[44px] px-4 bg-white hover:bg-[#ECEFE9] border border-[#8E9891] text-[#141916] font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors"
+                    >
+                      <span>Evaluasi Mingguan</span>
+                    </Link>
+                  </>
+                )}
+              </>
+            )}
 
-              {user.role === "trainer" && (
-                <>
-                  <Link
-                    href="/trainer"
-                    className="h-11 px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors shadow-xs"
-                  >
-                    <Users className="w-4 h-4" />
-                    <span>Kelola Klien Saya</span>
-                  </Link>
-                  <Link
-                    href="/training"
-                    className="h-11 px-5 bg-white/10 hover:bg-white/20 text-white border border-white/25 font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors"
-                  >
-                    <span>Dashboard Latihan</span>
-                  </Link>
-                </>
-              )}
+            {user.role === "trainer" && (
+              <>
+                <Link
+                  href="/trainer"
+                  className="min-h-[44px] px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors shadow-xs"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Kelola Klien Saya</span>
+                </Link>
+                <Link
+                  href="/training"
+                  className="min-h-[44px] px-4 bg-white hover:bg-[#ECEFE9] border border-[#8E9891] text-[#141916] font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors"
+                >
+                  <span>Latihan Pribadi</span>
+                </Link>
+              </>
+            )}
 
-              {user.role === "admin" && (
-                <>
-                  <Link
-                    href="/admin"
-                    className="h-11 px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors shadow-xs"
-                  >
-                    <ShieldAlert className="w-4 h-4" />
-                    <span>Buka Admin Panel</span>
-                  </Link>
-                  <Link
-                    href="/exercises"
-                    className="h-11 px-5 bg-white/10 hover:bg-white/20 text-white border border-white/25 font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors"
-                  >
-                    <span>Katalog Gerakan</span>
-                  </Link>
-                </>
-              )}
-            </div>
+            {user.role === "admin" && (
+              <>
+                <Link
+                  href="/admin"
+                  className="min-h-[44px] px-5 bg-[#C84B11] hover:bg-[#A83D0B] text-white font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors shadow-xs"
+                >
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>Buka Admin Panel</span>
+                </Link>
+                <Link
+                  href="/exercises"
+                  className="min-h-[44px] px-4 bg-white hover:bg-[#ECEFE9] border border-[#8E9891] text-[#141916] font-semibold rounded-xl text-sm inline-flex items-center gap-2 transition-colors"
+                >
+                  <span>Katalog Gerakan</span>
+                </Link>
+              </>
+            )}
           </div>
         </section>
 
         {/* ================================================================= */}
-        {/* 2. 4-COLUMN KPI METRICS STRIP                                     */}
+        {/* 2. UNIFIED EDITORIAL 4-COLUMN KPI STRIP                           */}
         {/* ================================================================= */}
         {user.role === "client" && (
           <section
             aria-label="Ringkasan performa minggu ini"
-            className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+            className="bg-white border border-[#DCE1D8] rounded-2xl grid grid-cols-2 lg:grid-cols-4 overflow-hidden"
           >
             {/* Kepatuhan Minggu Ini */}
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 flex flex-col justify-between gap-3">
+            <div className="p-5 border-b lg:border-b-0 border-r border-[#DCE1D8] flex flex-col justify-between gap-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-[#48524C]">
                   Kepatuhan Minggu Ini
@@ -495,28 +464,37 @@ export default function MemberHomeDashboard() {
                   <span className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-[#141916]">
                     {completionPct}%
                   </span>
-                  <span className="text-xs text-[#626E67] font-mono tabular-nums">
+                  <span className="text-xs text-[#48524C] font-mono tabular-nums">
                     {completedSessions}/{scheduledSessions} sesi
                   </span>
                 </div>
-                <div className="mt-2.5 h-1.5 w-full rounded-full bg-[#ECEFE9] overflow-hidden">
+                <div
+                  role="progressbar"
+                  aria-label="Persentase kepatuhan jadwal minggu ini"
+                  aria-valuenow={completionPct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  className="mt-2.5 h-1.5 w-full rounded-full bg-[#ECEFE9] overflow-hidden"
+                >
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
                       completionPct >= 80 ? "bg-[#047857]" : "bg-[#C84B11]"
                     }`}
-                    style={{ width: `${Math.min(100, Math.max(0, completionPct))}%` }}
+                    style={{
+                      width: `${Math.min(100, Math.max(0, completionPct))}%`,
+                    }}
                   />
                 </div>
               </div>
             </div>
 
             {/* Tonase Minggu Ini */}
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 flex flex-col justify-between gap-3">
+            <div className="p-5 border-b lg:border-b-0 lg:border-r border-[#DCE1D8] flex flex-col justify-between gap-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-[#48524C]">
                   Tonase Minggu Ini
                 </span>
-                <Flame className="w-4 h-4 text-[#C84B11] shrink-0" />
+                <Flame className="w-4 h-4 text-[#A83D0B] shrink-0" />
               </div>
               <div>
                 <div className="flex items-baseline gap-1.5">
@@ -527,7 +505,7 @@ export default function MemberHomeDashboard() {
                     kg
                   </span>
                 </div>
-                <div className="mt-2 flex items-center gap-1.5 text-xs">
+                <div className="mt-2 text-xs">
                   {tonnageDeltaPct !== null ? (
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border font-mono tabular-nums font-semibold ${
@@ -545,8 +523,8 @@ export default function MemberHomeDashboard() {
                       {tonnageDeltaPct}% vs minggu lalu
                     </span>
                   ) : (
-                    <span className="text-[#626E67]">
-                      Akumulasi beban × repetisi
+                    <span className="text-[#48524C]">
+                      Tonase = total beban × repetisi
                     </span>
                   )}
                 </div>
@@ -554,7 +532,7 @@ export default function MemberHomeDashboard() {
             </div>
 
             {/* Rata-rata RIR */}
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 flex flex-col justify-between gap-3">
+            <div className="p-5 border-r border-[#DCE1D8] flex flex-col justify-between gap-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-[#48524C]">
                   Rata-rata RIR
@@ -572,18 +550,21 @@ export default function MemberHomeDashboard() {
                     </span>
                   )}
                 </div>
-                <div className="mt-2">
+                <div className="mt-2 space-y-1">
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-semibold ${rirZone.badgeClass}`}
                   >
                     {rirZone.label}
                   </span>
+                  <p className="text-xs text-[#626E67]">
+                    RIR = sisa rep sebelum gagal
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* Total Set Tercatat */}
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 flex flex-col justify-between gap-3">
+            <div className="p-5 flex flex-col justify-between gap-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-[#48524C]">
                   Total Set Tercatat
@@ -599,7 +580,7 @@ export default function MemberHomeDashboard() {
                     set
                   </span>
                 </div>
-                <p className="mt-2 text-xs text-[#626E67] font-mono tabular-nums">
+                <p className="mt-2 text-xs text-[#48524C] font-mono tabular-nums">
                   {formatWeight(lifetimeVolume)} kg total sepanjang waktu
                 </p>
               </div>
@@ -610,9 +591,9 @@ export default function MemberHomeDashboard() {
         {user.role === "trainer" && (
           <section
             aria-label="Ringkasan trainer"
-            className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+            className="bg-white border border-[#DCE1D8] rounded-2xl grid grid-cols-2 lg:grid-cols-4 overflow-hidden"
           >
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 space-y-2">
+            <div className="p-5 border-b lg:border-b-0 border-r border-[#DCE1D8] space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold text-[#48524C]">
                 <span>Klien Aktif</span>
                 <Users className="w-4 h-4 text-[#1D4ED8]" />
@@ -623,7 +604,7 @@ export default function MemberHomeDashboard() {
               <p className="text-xs text-[#626E67]">Member dalam bimbingan</p>
             </div>
 
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 space-y-2">
+            <div className="p-5 border-b lg:border-b-0 lg:border-r border-[#DCE1D8] space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold text-[#48524C]">
                 <span>Permintaan Pending</span>
                 <Clock className="w-4 h-4 text-[#B45309]" />
@@ -634,10 +615,10 @@ export default function MemberHomeDashboard() {
               <p className="text-xs text-[#626E67]">Menunggu persetujuan</p>
             </div>
 
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 space-y-2">
+            <div className="p-5 border-r border-[#DCE1D8] space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold text-[#48524C]">
                 <span>Katalog Gerakan</span>
-                <BookOpen className="w-4 h-4 text-[#047857]" />
+                <Dumbbell className="w-4 h-4 text-[#047857]" />
               </div>
               <p className="text-3xl font-bold font-mono tabular-nums text-[#141916]">
                 53+
@@ -645,10 +626,10 @@ export default function MemberHomeDashboard() {
               <p className="text-xs text-[#626E67]">15 sub-bagian otot</p>
             </div>
 
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 space-y-2">
+            <div className="p-5 space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold text-[#48524C]">
                 <span>Spesialisasi</span>
-                <Award className="w-4 h-4 text-[#C84B11]" />
+                <Award className="w-4 h-4 text-[#A83D0B]" />
               </div>
               <p className="text-base font-bold text-[#141916] truncate pt-1">
                 {user.specialization || "Coach Hipertrofi"}
@@ -661,9 +642,9 @@ export default function MemberHomeDashboard() {
         {user.role === "admin" && (
           <section
             aria-label="Statistik platform"
-            className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+            className="bg-white border border-[#DCE1D8] rounded-2xl grid grid-cols-2 lg:grid-cols-4 overflow-hidden"
           >
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 space-y-2">
+            <div className="p-5 border-b lg:border-b-0 border-r border-[#DCE1D8] space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold text-[#48524C]">
                 <span>Total Pengguna</span>
                 <Users className="w-4 h-4 text-[#141916]" />
@@ -674,7 +655,7 @@ export default function MemberHomeDashboard() {
               <p className="text-xs text-[#626E67]">Semua akun aktif</p>
             </div>
 
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 space-y-2">
+            <div className="p-5 border-b lg:border-b-0 lg:border-r border-[#DCE1D8] space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold text-[#48524C]">
                 <span>Total Member</span>
                 <Award className="w-4 h-4 text-[#047857]" />
@@ -685,7 +666,7 @@ export default function MemberHomeDashboard() {
               <p className="text-xs text-[#626E67]">Peserta program latihan</p>
             </div>
 
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 space-y-2">
+            <div className="p-5 border-r border-[#DCE1D8] space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold text-[#48524C]">
                 <span>Total Trainer</span>
                 <UserCheck className="w-4 h-4 text-[#1D4ED8]" />
@@ -696,10 +677,10 @@ export default function MemberHomeDashboard() {
               <p className="text-xs text-[#626E67]">Personal trainer terdaftar</p>
             </div>
 
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-5 space-y-2">
+            <div className="p-5 space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold text-[#48524C]">
                 <span>Total Log Latihan</span>
-                <Activity className="w-4 h-4 text-[#C84B11]" />
+                <Activity className="w-4 h-4 text-[#A83D0B]" />
               </div>
               <p className="text-3xl font-bold font-mono tabular-nums text-[#141916]">
                 {adminStats?.total_logs ?? 0}
@@ -710,21 +691,21 @@ export default function MemberHomeDashboard() {
         )}
 
         {/* ================================================================= */}
-        {/* 3. ASYMMETRIC 12-COLUMN BENTO GRID                                */}
+        {/* 3. FOCUSED 12-COLUMN EDITORIAL BENTO                              */}
         {/* ================================================================= */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* LEFT COLUMN (7 cols) */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* LEFT COLUMN (7 cols): Weekly Rhythm + Insights */}
           <div className="lg:col-span-7 space-y-6">
             {user.role === "client" && (
               <>
-                {/* Ritme Minggu Ini Card */}
+                {/* Ritme Minggu Ini */}
                 <div className="bg-white border border-[#DCE1D8] rounded-2xl p-6 space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-bold text-[#141916]">
                         Ritme Minggu Ini
                       </h2>
-                      <p className="text-xs text-[#626E67] mt-0.5">
+                      <p className="text-xs text-[#48524C] mt-0.5">
                         {hasPlan && todaySession?.user_plan?.split?.name
                           ? `Split aktif: ${todaySession.user_plan.split.name}`
                           : "Ringkasan jadwal latihan Senin hingga Minggu"}
@@ -733,15 +714,15 @@ export default function MemberHomeDashboard() {
                     <div className="flex items-center gap-2">
                       <Link
                         href="/onboarding"
-                        className="px-3 py-1.5 rounded-lg border border-[#DCE1D8] bg-[#F5F6F3] hover:bg-[#ECEFE9] text-xs font-semibold text-[#141916] transition-colors"
+                        className="min-h-[40px] px-3.5 rounded-xl border border-[#8E9891] bg-[#F5F6F3] hover:bg-[#ECEFE9] text-xs font-semibold text-[#141916] transition-colors inline-flex items-center"
                       >
                         Atur Jadwal
                       </Link>
                       <Link
                         href="/training"
-                        className="px-3 py-1.5 rounded-lg bg-[#FFF1EA] hover:bg-[#F4C4AC]/50 border border-[#F4C4AC] text-xs font-semibold text-[#C84B11] transition-colors inline-flex items-center gap-1"
+                        className="min-h-[40px] px-3.5 rounded-xl bg-[#FFF1EA] hover:bg-[#F4C4AC]/40 border border-[#F4C4AC] text-xs font-semibold text-[#A83D0B] transition-colors inline-flex items-center gap-1"
                       >
-                        <span>Buka Latihan</span>
+                        <span>Kelola Sesi</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </Link>
                     </div>
@@ -749,7 +730,7 @@ export default function MemberHomeDashboard() {
 
                   {!hasPlan || weekOverview.length === 0 ? (
                     <div className="p-6 rounded-xl bg-[#F5F6F3] border border-[#DCE1D8] text-center space-y-3">
-                      <CalendarRange className="w-8 h-8 text-[#C84B11] mx-auto" />
+                      <CalendarRange className="w-8 h-8 text-[#A83D0B] mx-auto" />
                       <div className="space-y-1">
                         <p className="text-sm font-semibold text-[#141916]">
                           Belum ada jadwal mingguan aktif
@@ -761,68 +742,53 @@ export default function MemberHomeDashboard() {
                       </div>
                       <Link
                         href="/onboarding"
-                        className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-[#C84B11] hover:bg-[#A83D0B] text-white text-xs font-semibold transition-colors"
+                        className="inline-flex items-center gap-2 min-h-[44px] px-5 rounded-xl bg-[#C84B11] hover:bg-[#A83D0B] text-white text-xs font-semibold transition-colors"
                       >
                         <span>Susun Jadwal Sekarang</span>
                         <ArrowRight className="w-3.5 h-3.5" />
                       </Link>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-7 gap-2">
+                    <div className="flex overflow-x-auto snap-x gap-2.5 pb-1 sm:grid sm:grid-cols-7 sm:gap-2 sm:overflow-visible sm:pb-0">
                       {weekOverview.map((day) => {
+                        const statusMeta =
+                          SESSION_STATUS_META[day.status] ||
+                          SESSION_STATUS_META.pending;
                         const isToday = day.is_today;
-                        const isDone = day.status === "done";
-                        const isSkipped = day.status === "skipped";
-                        const isRest = day.status === "rest";
 
                         let boxStyle =
                           "bg-[#F5F6F3] border-[#DCE1D8] text-[#141916]";
-                        let statusDot = "bg-[#C5CCC0]";
-                        let statusText = "Mendatang";
-
                         if (isToday) {
                           boxStyle =
                             "bg-[#FFF1EA] border-[#C84B11] text-[#141916] ring-1 ring-[#C84B11]/20";
-                          statusDot = "bg-[#C84B11]";
-                          statusText = "Hari Ini";
-                        } else if (isDone) {
+                        } else if (day.status === "done") {
                           boxStyle =
                             "bg-[#ECFDF5] border-[#A7F3D0] text-[#065F46]";
-                          statusDot = "bg-[#047857]";
-                          statusText = "Selesai";
-                        } else if (isSkipped) {
+                        } else if (day.status === "skipped") {
                           boxStyle =
                             "bg-[#FFF1F2] border-[#FECDD3] text-[#9F1239]";
-                          statusDot = "bg-[#BE123C]";
-                          statusText = "Dilewati";
-                        } else if (isRest) {
-                          boxStyle =
-                            "bg-[#F5F6F3] border-[#DCE1D8] text-[#626E67]";
-                          statusDot = "bg-[#9CA69F]";
-                          statusText = "Istirahat";
                         }
 
                         return (
                           <Link
                             key={day.day_of_week}
                             href="/training"
-                            className={`rounded-xl border p-2.5 flex flex-col justify-between gap-2 transition-colors hover:border-[#C84B11] min-h-[92px] ${boxStyle}`}
-                            title={`${day.day_short}: ${day.session_name} (${statusText})`}
+                            className={`min-w-[112px] sm:min-w-0 snap-start rounded-xl border p-3 flex flex-col justify-between gap-2 transition-colors hover:border-[#C84B11] min-h-[96px] ${boxStyle}`}
                           >
                             <div className="flex items-center justify-between gap-1">
-                              <span className="text-[11px] font-bold uppercase tracking-wide">
+                              <span className="text-xs font-bold uppercase tracking-wide">
                                 {day.day_short}
                               </span>
                               <span
-                                className={`w-2 h-2 rounded-full shrink-0 ${statusDot}`}
+                                className={`w-2 h-2 rounded-full shrink-0 ${statusMeta.dotClass}`}
                               />
                             </div>
                             <div className="space-y-0.5">
-                              <p className="text-[11px] font-semibold leading-tight line-clamp-2">
+                              <p className="text-xs font-semibold leading-snug line-clamp-2">
                                 {day.session_name}
                               </p>
-                              <p className="text-[10px] opacity-80 truncate">
-                                {statusText}
+                              <p className="text-xs opacity-85 truncate">
+                                {isToday ? "Hari Ini" : statusMeta.label}
                               </p>
                             </div>
                           </Link>
@@ -832,79 +798,56 @@ export default function MemberHomeDashboard() {
                   )}
                 </div>
 
-                {/* Sorotan & Saran Minggu Ini Card */}
+                {/* Sorotan & Saran Minggu Ini */}
                 <div className="bg-white border border-[#DCE1D8] rounded-2xl p-6 space-y-5">
                   <div className="flex items-center justify-between gap-3">
                     <h2 className="text-lg font-bold text-[#141916]">
-                      Sorotan & Saran Minggu Ini
+                      Saran & Evaluasi Progres
                     </h2>
                     <Link
                       href="/evaluation"
-                      className="text-xs font-semibold text-[#C84B11] hover:underline inline-flex items-center gap-1"
+                      className="min-h-[40px] px-2 text-xs font-semibold text-[#A83D0B] hover:underline inline-flex items-center gap-1"
                     >
                       <span>Detail Evaluasi</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>
 
-                  {/* Today's Session Preview */}
-                  {hasPlan && todaySession && (
-                    <div className="p-4 rounded-xl bg-[#F5F6F3] border border-[#DCE1D8] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="space-y-1.5 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
+                  {hasPlan && todaySession?.split_session?.muscle_groups && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#ECEFE9]">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
                           <span
-                            className={`px-2.5 py-0.5 rounded-full border text-[11px] font-semibold ${
-                              SESSION_STATUS_META[todaySession.status].pillClass
+                            className={`px-2.5 py-0.5 rounded-full border text-xs font-semibold ${
+                              SESSION_STATUS_META[todaySession.status]
+                                .badgeClass
                             }`}
                           >
                             {SESSION_STATUS_META[todaySession.status].label}
                           </span>
-                          <span className="text-xs text-[#626E67]">
-                            Jadwal Hari Ini
+                          <span className="text-xs font-semibold text-[#141916]">
+                            {todaySession.split_session.name}
                           </span>
                         </div>
-                        <p className="text-base font-bold text-[#141916] truncate">
-                          {todaySession.split_session?.name ||
-                            (todaySession.status === "rest"
-                              ? "Hari Pemulihan Otot"
-                              : "Sesi Latihan")}
+                        <p className="text-xs text-[#48524C]">
+                          Fokus otot:{" "}
+                          {todaySession.split_session.muscle_groups
+                            .map((m) => MUSCLE_LABELS[m] || m)
+                            .join(", ")}
                         </p>
-                        {todaySession.split_session?.muscle_groups &&
-                          todaySession.split_session.muscle_groups.length >
-                            0 && (
-                            <p className="text-xs text-[#48524C] truncate">
-                              Target otot:{" "}
-                              {todaySession.split_session.muscle_groups
-                                .map((m) => MUSCLE_LABELS[m] || m)
-                                .join(", ")}
-                            </p>
-                          )}
                       </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {todaySession.status === "pending" ? (
-                          <Link
-                            href={`/session/${todaySession.id}`}
-                            className="h-9 px-4 rounded-xl bg-[#C84B11] hover:bg-[#A83D0B] text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                            <span>Mulai Sesi</span>
-                          </Link>
-                        ) : (
-                          <Link
-                            href="/training"
-                            className="h-9 px-4 rounded-xl bg-white hover:bg-[#ECEFE9] border border-[#C5CCC0] text-[#141916] text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
-                          >
-                            <span>Lihat Detail</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </Link>
-                        )}
-                      </div>
+                      <Link
+                        href="/training"
+                        className="min-h-[40px] px-3.5 rounded-xl border border-[#8E9891] bg-[#F5F6F3] hover:bg-[#ECEFE9] text-xs font-semibold text-[#141916] inline-flex items-center gap-1"
+                      >
+                        <span>Atur / Geser</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
                     </div>
                   )}
 
-                  {/* Weekly Suggestions */}
-                  {weeklyEval?.suggestions && weeklyEval.suggestions.length > 0 ? (
+                  {weeklyEval?.suggestions &&
+                  weeklyEval.suggestions.length > 0 ? (
                     <div className="space-y-2.5">
                       {weeklyEval.suggestions.slice(0, 2).map((item, idx) => {
                         const styleMap = {
@@ -947,7 +890,7 @@ export default function MemberHomeDashboard() {
                             {item.action_href && item.action_label && (
                               <Link
                                 href={item.action_href}
-                                className="text-[11px] font-semibold underline shrink-0 mt-0.5"
+                                className="text-xs font-semibold underline shrink-0 mt-0.5"
                               >
                                 {item.action_label}
                               </Link>
@@ -957,9 +900,9 @@ export default function MemberHomeDashboard() {
                       })}
                     </div>
                   ) : (
-                    <p className="text-xs text-[#626E67] leading-relaxed">
+                    <p className="text-xs text-[#48524C] leading-relaxed">
                       Catat minimal satu sesi latihan minggu ini untuk menerima
-                      analisis progres otomatis dari sistem evaluasi.
+                      analisis beban dan rekomendasi progres otomatis.
                     </p>
                   )}
                 </div>
@@ -973,13 +916,13 @@ export default function MemberHomeDashboard() {
                     <h2 className="text-lg font-bold text-[#141916]">
                       Daftar Klien Aktif
                     </h2>
-                    <p className="text-xs text-[#626E67] mt-0.5">
+                    <p className="text-xs text-[#48524C] mt-0.5">
                       Member yang terhubung dengan program bimbingan Anda
                     </p>
                   </div>
                   <Link
                     href="/trainer"
-                    className="px-3 py-1.5 rounded-lg bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] text-xs font-semibold text-[#1D4ED8] transition-colors inline-flex items-center gap-1"
+                    className="min-h-[40px] px-3.5 rounded-xl bg-[#EFF6FF] hover:bg-[#DBEAFE] border border-[#BFDBFE] text-xs font-semibold text-[#1D4ED8] transition-colors inline-flex items-center gap-1"
                   >
                     <span>Kelola Semua</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -1021,7 +964,7 @@ export default function MemberHomeDashboard() {
                       <Link
                         key={client.id}
                         href="/trainer"
-                        className="flex items-center justify-between gap-3 px-4 py-3 bg-white hover:bg-[#F5F6F3] transition-colors"
+                        className="flex items-center justify-between gap-3 px-4 py-3 bg-white hover:bg-[#F5F6F3] transition-colors min-h-[56px]"
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="w-9 h-9 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] text-[#1D4ED8] text-xs font-bold flex items-center justify-center shrink-0">
@@ -1031,7 +974,7 @@ export default function MemberHomeDashboard() {
                             <p className="text-sm font-semibold text-[#141916] truncate">
                               {client.name}
                             </p>
-                            <p className="text-xs text-[#626E67] truncate">
+                            <p className="text-xs text-[#48524C] truncate">
                               {client.email}
                             </p>
                           </div>
@@ -1051,13 +994,13 @@ export default function MemberHomeDashboard() {
                     <h2 className="text-lg font-bold text-[#141916]">
                       Ringkasan Platform
                     </h2>
-                    <p className="text-xs text-[#626E67] mt-0.5">
+                    <p className="text-xs text-[#48524C] mt-0.5">
                       Status master data gerakan dan aktivitas keseluruhan
                     </p>
                   </div>
                   <Link
                     href="/admin"
-                    className="px-3 py-1.5 rounded-lg bg-[#FFF1F2] hover:bg-[#FFE4E6] border border-[#FECDD3] text-xs font-semibold text-[#BE123C] transition-colors inline-flex items-center gap-1"
+                    className="min-h-[40px] px-3.5 rounded-xl bg-[#FFF1F2] hover:bg-[#FFE4E6] border border-[#FECDD3] text-xs font-semibold text-[#BE123C] transition-colors inline-flex items-center gap-1"
                   >
                     <span>Buka Moderasi</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -1092,37 +1035,8 @@ export default function MemberHomeDashboard() {
             )}
           </div>
 
-          {/* RIGHT COLUMN (5 cols) */}
+          {/* RIGHT COLUMN (5 cols): Personal Trainer + Recent Set Feed + Custom Exercises */}
           <div className="lg:col-span-5 space-y-6">
-            {/* Akses Cepat 2x2 Grid */}
-            <div className="bg-white border border-[#DCE1D8] rounded-2xl p-6 space-y-4">
-              <h2 className="text-lg font-bold text-[#141916]">Akses Cepat</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {quickActions.map((action) => (
-                  <Link
-                    key={action.href}
-                    href={action.href}
-                    className="p-3.5 rounded-xl border border-[#DCE1D8] bg-[#F5F6F3] hover:bg-white hover:border-[#C84B11] transition-colors flex flex-col gap-2.5 group"
-                  >
-                    <div
-                      className={`w-9 h-9 rounded-lg border flex items-center justify-center ${action.iconBg}`}
-                    >
-                      {action.icon}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[#141916] group-hover:text-[#C84B11] transition-colors leading-tight">
-                        {action.title}
-                      </p>
-                      <p className="text-[11px] text-[#626E67] mt-0.5 leading-snug">
-                        {action.subtitle}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* Personal Trainer Card (for client) */}
             {user.role === "client" && (
               <div className="bg-white border border-[#DCE1D8] rounded-2xl p-6 space-y-4">
                 <div className="flex items-center justify-between gap-2">
@@ -1131,7 +1045,7 @@ export default function MemberHomeDashboard() {
                   </h2>
                   <Link
                     href="/client/trainer"
-                    className="text-xs font-semibold text-[#C84B11] hover:underline inline-flex items-center gap-1"
+                    className="min-h-[40px] px-2 text-xs font-semibold text-[#A83D0B] hover:underline inline-flex items-center gap-1"
                   >
                     <span>{assignedTrainer ? "Kelola" : "Cari Trainer"}</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -1151,7 +1065,7 @@ export default function MemberHomeDashboard() {
                         {assignedTrainer.specialization || "Personal Trainer"}
                       </p>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full bg-[#ECFDF5] border border-[#A7F3D0] text-[#047857] text-[11px] font-semibold shrink-0">
+                    <span className="px-2.5 py-1 rounded-full bg-[#ECFDF5] border border-[#A7F3D0] text-[#047857] text-xs font-semibold shrink-0">
                       Aktif
                     </span>
                   </div>
@@ -1164,7 +1078,7 @@ export default function MemberHomeDashboard() {
                     </p>
                     <Link
                       href="/client/trainer"
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#C84B11] hover:underline"
+                      className="inline-flex items-center gap-1.5 min-h-[40px] text-xs font-semibold text-[#A83D0B] hover:underline"
                     >
                       <span>Pilih Personal Trainer</span>
                       <ArrowRight className="w-3.5 h-3.5" />
@@ -1174,7 +1088,6 @@ export default function MemberHomeDashboard() {
               </div>
             )}
 
-            {/* Aktivitas Set Terbaru (for client) */}
             {user.role === "client" && (
               <div className="bg-white border border-[#DCE1D8] rounded-2xl p-6 space-y-4">
                 <div className="flex items-center justify-between gap-2">
@@ -1183,7 +1096,7 @@ export default function MemberHomeDashboard() {
                   </h2>
                   <Link
                     href="/client/progress"
-                    className="text-xs font-semibold text-[#C84B11] hover:underline inline-flex items-center gap-1"
+                    className="min-h-[40px] px-2 text-xs font-semibold text-[#A83D0B] hover:underline inline-flex items-center gap-1"
                   >
                     <span>Semua Riwayat</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -1191,7 +1104,7 @@ export default function MemberHomeDashboard() {
                 </div>
 
                 {recentLogs.length === 0 ? (
-                  <p className="text-xs text-[#626E67] py-2">
+                  <p className="text-xs text-[#48524C] py-2">
                     Belum ada catatan set. Mulai sesi latihan untuk merekam
                     beban, repetisi, dan RIR Anda.
                   </p>
@@ -1201,14 +1114,17 @@ export default function MemberHomeDashboard() {
                       const zone = getRirZone(log.rir);
                       return (
                         <div
-                          key={log.id ?? `${log.exercise_id}-${log.set_number}-${log.created_at || ""}`}
+                          key={
+                            log.id ??
+                            `${log.exercise_id}-${log.set_number}-${log.created_at || ""}`
+                          }
                           className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3"
                         >
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-[#141916] truncate">
                               {log.exercise?.name || "Gerakan Latihan"}
                             </p>
-                            <p className="text-xs text-[#626E67] font-mono tabular-nums">
+                            <p className="text-xs text-[#48524C] font-mono tabular-nums">
                               {formatWeight(log.weight)} kg × {log.reps} rep
                               {log.created_at
                                 ? ` · ${formatShortDate(log.created_at)}`
@@ -1217,7 +1133,7 @@ export default function MemberHomeDashboard() {
                           </div>
                           {log.rir !== null && log.rir !== undefined && (
                             <span
-                              className={`px-2 py-0.5 rounded-full border text-[11px] font-mono tabular-nums font-semibold shrink-0 ${zone.badgeClass}`}
+                              className={`px-2.5 py-0.5 rounded-full border text-xs font-mono tabular-nums font-semibold shrink-0 ${zone.badgeClass}`}
                             >
                               {log.rir} RIR
                             </span>
@@ -1229,6 +1145,24 @@ export default function MemberHomeDashboard() {
                 )}
               </div>
             )}
+
+            {/* Editorial Resource Strip (non-duplicative links) */}
+            <div className="border-t border-[#DCE1D8] pt-5 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <Link
+                href="/exercises"
+                className="font-semibold text-[#141916] hover:text-[#A83D0B] inline-flex items-center gap-1.5 min-h-[40px]"
+              >
+                <span>Jelajahi 53 Gerakan & Ilustrasi Otot</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <Link
+                href="/my-exercises"
+                className="font-semibold text-[#A83D0B] hover:underline inline-flex items-center gap-1 min-h-[40px]"
+              >
+                <span>Gerakan Custom Saya</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </div>
         </section>
       </div>
