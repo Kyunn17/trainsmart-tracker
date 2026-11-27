@@ -477,9 +477,8 @@ export default function MemberHomeDashboard() {
                   className="mt-2.5 h-1.5 w-full rounded-full bg-[#ECEFE9] overflow-hidden"
                 >
                   <div
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      completionPct >= 80 ? "bg-[#047857]" : "bg-[#C84B11]"
-                    }`}
+                    className={`h-full rounded-full transition-all duration-300 ${completionPct >= 80 ? "bg-[#047857]" : "bg-[#C84B11]"
+                      }`}
                     style={{
                       width: `${Math.min(100, Math.max(0, completionPct))}%`,
                     }}
@@ -508,11 +507,10 @@ export default function MemberHomeDashboard() {
                 <div className="mt-2 text-xs">
                   {tonnageDeltaPct !== null ? (
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border font-mono tabular-nums font-semibold ${
-                        tonnageDeltaPct >= 0
-                          ? "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]"
-                          : "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]"
-                      }`}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border font-mono tabular-nums font-semibold ${tonnageDeltaPct >= 0
+                        ? "bg-[#ECFDF5] text-[#047857] border-[#A7F3D0]"
+                        : "bg-[#FFF1F2] text-[#BE123C] border-[#FECDD3]"
+                        }`}
                     >
                       {tonnageDeltaPct >= 0 ? (
                         <TrendingUp className="w-3 h-3" />
@@ -818,10 +816,9 @@ export default function MemberHomeDashboard() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`px-2.5 py-0.5 rounded-full border text-xs font-semibold ${
-                              SESSION_STATUS_META[todaySession.status]
-                                .badgeClass
-                            }`}
+                            className={`px-2.5 py-0.5 rounded-full border text-xs font-semibold ${SESSION_STATUS_META[todaySession.status]
+                              .badgeClass
+                              }`}
                           >
                             {SESSION_STATUS_META[todaySession.status].label}
                           </span>
@@ -847,7 +844,7 @@ export default function MemberHomeDashboard() {
                   )}
 
                   {weeklyEval?.suggestions &&
-                  weeklyEval.suggestions.length > 0 ? (
+                    weeklyEval.suggestions.length > 0 ? (
                     <div className="space-y-2.5">
                       {weeklyEval.suggestions.slice(0, 2).map((item, idx) => {
                         const styleMap = {
